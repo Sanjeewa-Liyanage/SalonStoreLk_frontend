@@ -30,10 +30,14 @@ export default function LoginPage() {
       // Fetch full user profile using the access token
       const userProfile = await getUserProfile(data.backendTokens.accessToken);
       localStorage.setItem("user", JSON.stringify(userProfile));
-
-      // Redirect after login
-      router.push("/");
-      alert(`Login successful! Welcome back.`);
+      console.log("User profile after login:", userProfile);
+      if(userProfile.role === "ADMIN" && userProfile.adminLevel==="SUPER") {
+        router.push("/admin/dashboard");
+        
+        return;
+      }
+      
+      
 
     } catch (err: any) {
       alert(err?.response?.data?.message || "Login failed. Please try again.");
