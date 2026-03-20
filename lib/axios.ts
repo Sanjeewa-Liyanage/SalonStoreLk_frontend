@@ -7,10 +7,42 @@ const apiClient = axios.create({
   },
 });
 
+async function refreshTokens() {
+  const refreshToken = localStorage.getItem("refreshToken");
+
+  if (!refreshToken) {
+    throw new Error("No refresh token available");
+  }
+
+  const response = await axios.post(
+    "/api/auth/refresh",
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${refreshToken}`,
+      },
+    }
+  );
+
+  const { accessToken, refreshToken: nextRefreshToken } = response.data;
+
+  if (!accessToken || !nextRefreshToken) {
+    throw new Error("Invalid refresh token response");
+  }
+
+  localStorage.setItem("accessToken", accessToken);
+  localStorage.setItem("refreshToken", nextRefreshToken);
+
+  return accessToken;
+}
+
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("accessToken");
-  if (token) {
-    config.headers["Authorization"] = `Bearer ${token}`;
+  // Only access localStorage on the client side
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -20,27 +52,12 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Only handle token refresh on the client side
+    if (typeof window !== "undefined" && error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
-
-        const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/refresh`,
-          {},  // empty body
-          {
-            headers: {
-              Authorization: `Bearer ${refreshToken}`,
-            },
-          }
-        );
-
-        const newAccessToken = res.data.accessToken;
-        const newRefreshToken = res.data.refreshToken;
-
-        localStorage.setItem("accessToken", newAccessToken);
-        localStorage.setItem("refreshToken", newRefreshToken);
+        const newAccessToken = await refreshTokens();
 
         originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
