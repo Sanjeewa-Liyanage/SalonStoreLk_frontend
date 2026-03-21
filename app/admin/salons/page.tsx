@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
 	Alert,
 	Box,
@@ -28,6 +29,8 @@ import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
 import { fetchAllSalons } from '@/lib/salonService';
+import SalonLoader from '@/components/Loader';
+
 interface Salon {
 	id: string;
 	salonCode: string;
@@ -44,6 +47,12 @@ interface Salon {
 		_nanoseconds: number;
 	};
 }
+type SalonTab = 'all' | 'active' | 'pending';
+
+const normalizeSalonTab = (value: string | null): SalonTab => {
+	if (value === 'active' || value === 'pending' || value === 'all') return value;
+	return 'all';
+};
 
 interface SalonApiResponse {
 	data: Salon[];
@@ -53,8 +62,6 @@ interface SalonApiResponse {
 		hasNext: boolean;
 	};
 }
-
-type SalonTab = 'all' | 'active' | 'pending';
 
 const statusColor = (status: string): 'success' | 'warning' | 'error' | 'default' => {
 	const normalized = status.toUpperCase();
@@ -70,6 +77,8 @@ const formatDate = (createdAt?: Salon['createdAt']) => {
 };
 
 export default function AdminSalonsPage() {
+	const router = useRouter();
+	const searchParams = useSearchParams();
 	const muiTheme = useTheme();
 	const { isDark } = useMuiTheme();
 	const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -78,10 +87,11 @@ export default function AdminSalonsPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [search, setSearch] = useState('');
-	const [activeTab, setActiveTab] = useState<SalonTab>('all');
 	const [page, setPage] = useState(1);
 
 	const rowsPerPage = 8;
+	const activeTab = normalizeSalonTab(searchParams.get('tab'));
+
 
 	useEffect(() => {
 		const loadSalons = async () => {
@@ -132,6 +142,30 @@ export default function AdminSalonsPage() {
 	useEffect(() => {
 		setPage(1);
 	}, [search]);
+
+	
+
+	const handleTabChange = (_: SyntheticEvent, value: SalonTab) => {
+	setPage(1);
+	const href = value === 'all' ? '/admin/salons' : `/admin/salons?tab=${value}`;
+	router.push(href, { scroll: false });
+	};
+
+	if (loading) {
+		return (
+			<Box
+				sx={{
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					minHeight: '100vh',
+					backgroundColor: isDark ? '#0d0f1a' : '#f9fafb',
+				}}
+			>
+				<SalonLoader />
+			</Box>
+		);
+	}
 
 	return (
 		<Box
@@ -261,7 +295,7 @@ export default function AdminSalonsPage() {
 								>
 									<Tabs
 										value={activeTab}
-										onChange={(_, value) => setActiveTab(value)}
+										onChange={handleTabChange}
 										sx={{
 											'& .MuiTabs-indicator': {
 												backgroundColor: '#a78bfa',
@@ -365,16 +399,6 @@ export default function AdminSalonsPage() {
 													</Box>
 
 													<Box component="tbody">
-														{loading && (
-															<Box component="tr">
-																<Box component="td" colSpan={7} sx={{ p: 3 }}>
-																	<Typography sx={{ color: isDark ? '#8ea0c4' : '#64748b' }}>
-																		Loading salons...
-																	</Typography>
-																</Box>
-															</Box>
-														)}
-
 														{!loading &&
 															paginatedSalons.map((salon) => (
 																<Box
