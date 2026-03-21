@@ -5,7 +5,6 @@ import {
   Drawer,
   Box,
   List,
-  ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
@@ -15,7 +14,6 @@ import {
   Chip,
   useMediaQuery,
   IconButton,
-  Divider,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
@@ -31,6 +29,7 @@ import {
   Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useMuiTheme } from '@/context/MuiThemeContext';
+import Link from 'next/link';
 
 const MENU_ITEMS = [
   {
@@ -44,8 +43,8 @@ const MENU_ITEMS = [
     href: '/admin/salons',
     children: [
       { label: 'All Salons', href: '/admin/salons' },
-      { label: 'Pending Approval', href: '/admin/salons/pending' },
-      { label: 'Active Salons', href: '/admin/salons/active' },
+      { label: 'Pending Approval', href: '/admin/salons?tab=pending' },
+      { label: 'Active Salons', href: '/admin/salons?tab=active' },
     ],
   },
   {
@@ -145,7 +144,7 @@ export default function Sidebar() {
             <ListItemButton
               onClick={() => item.children && toggleExpand(item.label)}
               href={!item.children ? item.href : undefined}
-              component={!item.children ? 'a' : 'button'}
+              component={!item.children ? Link : 'button'}
               sx={{
                 borderRadius: '8px',
                 mb: 0.5,
@@ -190,7 +189,7 @@ export default function Sidebar() {
                     <ListItemButton
                       key={child.label}
                       href={child.href}
-                      component="a"
+                      component={Link}
                       sx={{
                         pl: 6,
                         borderRadius: '6px',
