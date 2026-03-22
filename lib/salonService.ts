@@ -25,7 +25,8 @@ async function salonPatchRequest(params: Record<string, string>, accessToken: st
   const requestParams = { ...params };
   delete requestParams.reason;
 
-  const body = params.action === 'suspend' && reason ? { reason } : {};
+  const body = (params.action === 'suspend' || params.action === 'reject') && reason ? { reason } : {};
+  
   const query = new URLSearchParams(requestParams).toString();
   try {
 	const { data } = await axios.patch(`/api/salons?${query}`, body, {
@@ -53,4 +54,6 @@ export const fetchSalonById    = (id: string, token: string) => salonRequest({ t
 export const activateSalon = (id: string, token: string) => salonPatchRequest({ action: "activate", id }, token);
 export const suspendSalon = (id: string, reason: string, token: string) =>
   salonPatchRequest({ action: "suspend", id, reason }, token);
+export const rejectSalon = (id: string, reason: string, token: string) =>
+  salonPatchRequest({ action: "reject", id, reason }, token);
 export const unsuspendSalon = (id: string, token: string) => salonPatchRequest({ action: "unsuspend", id }, token);
