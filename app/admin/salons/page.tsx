@@ -29,7 +29,7 @@ import {
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { fetchAllSalons, activateSalon, suspendSalon, unsuspendSalon } from '@/lib/salonService';
+import { fetchAllSalons, activateSalon, rejectSalon, suspendSalon, unsuspendSalon } from '@/lib/salonService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SuspendReasonDialog from '@/components/SuspendReasonDialog';
@@ -266,6 +266,10 @@ export default function AdminSalonsPage() {
 	const [suspendReason, setSuspendReason] = useState('');
 	const [suspendReasonError, setSuspendReasonError] = useState<string | null>(null);
 	const [suspendConfirmState, setSuspendConfirmState] = useState<{ salonId: string; reason: string } | null>(null);
+	const [rejectReasonDialogId, setRejectReasonDialogId] = useState<string | null>(null);
+	const [rejectReason, setRejectReason] = useState('');
+	const [rejectReasonError, setRejectReasonError] = useState<string | null>(null);
+	const [rejectConfirmState, setRejectConfirmState] = useState<{ salonId: string; reason: string } | null>(null);
 	const [unsuspendConfirmId, setUnsuspendConfirmId] = useState<string | null>(null);
 
 	const rowsPerPage = 8;
@@ -386,15 +390,15 @@ export default function AdminSalonsPage() {
 	};
 
 	// ── Reject ──
-	const handleReject = async (salonId: string) => {
+	const handleReject = async (salonId: string, reason: string) => {
 		try {
 			setProcessingId(salonId);
 			setActionError(null);
 			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
-			// TODO: call reject API endpoint when available
-			// Optimistically update local state
+			await rejectSalon(salonId, reason, token);
+
 			setAllSalons((prev) =>
 				prev.map((s) => (s.id === salonId ? { ...s, status: 'REJECTED' } : s))
 			);
@@ -456,6 +460,13 @@ export default function AdminSalonsPage() {
 		setUnsuspendConfirmId(salonId);
 	};
 
+	const requestReject = (salonId: string) => {
+		setRejectReasonDialogId(salonId);
+		setRejectReason('');
+		setRejectReasonError(null);
+		setRejectConfirmState(null);
+	};
+
 	const cancelSuspendReason = () => {
 		if (processingId) return;
 		setSuspendReasonDialogId(null);
@@ -488,6 +499,33 @@ export default function AdminSalonsPage() {
 		setUnsuspendConfirmId(null);
 	};
 
+	const cancelRejectReason = () => {
+		if (processingId) return;
+		setRejectReasonDialogId(null);
+		setRejectReasonError(null);
+		setRejectReason('');
+	};
+
+	const continueRejectReason = () => {
+		if (!rejectReasonDialogId) return;
+		const trimmedReason = rejectReason.trim();
+		if (!trimmedReason) {
+			setRejectReasonError('Reject reason is required.');
+			return;
+		}
+
+		setRejectReasonError(null);
+		setRejectConfirmState({ salonId: rejectReasonDialogId, reason: trimmedReason });
+		setRejectReasonDialogId(null);
+	};
+
+	const cancelRejectConfirm = () => {
+		if (processingId) return;
+		setRejectConfirmState(null);
+		setRejectReason('');
+		setRejectReasonError(null);
+	};
+
 	const confirmSuspend = async () => {
 		if (!suspendConfirmState) return;
 		await handleSuspend(suspendConfirmState.salonId, suspendConfirmState.reason);
@@ -502,6 +540,14 @@ export default function AdminSalonsPage() {
 		setUnsuspendConfirmId(null);
 	};
 
+	const confirmReject = async () => {
+		if (!rejectConfirmState) return;
+		await handleReject(rejectConfirmState.salonId, rejectConfirmState.reason);
+		setRejectConfirmState(null);
+		setRejectReason('');
+		setRejectReasonError(null);
+	};
+
 	const suspendTargetSalon = useMemo(
 		() => allSalons.find((salon) => salon.id === (suspendConfirmState?.salonId ?? suspendReasonDialogId)),
 		[allSalons, suspendConfirmState?.salonId, suspendReasonDialogId]
@@ -510,6 +556,11 @@ export default function AdminSalonsPage() {
 	const unsuspendTargetSalon = useMemo(
 		() => allSalons.find((salon) => salon.id === unsuspendConfirmId),
 		[allSalons, unsuspendConfirmId]
+	);
+
+	const rejectTargetSalon = useMemo(
+		() => allSalons.find((salon) => salon.id === (rejectConfirmState?.salonId ?? rejectReasonDialogId)),
+		[allSalons, rejectConfirmState?.salonId, rejectReasonDialogId]
 	);
 
 	if (loading) {
@@ -673,7 +724,7 @@ export default function AdminSalonsPage() {
 												showActions={activeTab === 'pending' || activeTab === 'active' || activeTab === 'suspended'}
 												processingId={processingId}
 												onApprove={handleApprove}
-												onReject={handleReject}
+												onReject={requestReject}
 												onSuspend={requestSuspend}
 												onUnsuspend={requestUnsuspend}
 											/>
@@ -716,6 +767,27 @@ export default function AdminSalonsPage() {
 				onConfirm={continueSuspendReason}
 			/>
 
+			<SuspendReasonDialog
+				open={Boolean(rejectReasonDialogId)}
+				salonName={rejectTargetSalon?.salonName}
+				reason={rejectReason}
+				error={rejectReasonError}
+				loading={Boolean(processingId)}
+				title="Reject Salon"
+				actionVerb="rejecting"
+				inputLabel="Reject Reason"
+				helperText="This reason will be sent with the reject request."
+				confirmColor="error"
+				onReasonChange={(value) => {
+					setRejectReason(value);
+					if (rejectReasonError) {
+						setRejectReasonError(null);
+					}
+				}}
+				onCancel={cancelRejectReason}
+				onConfirm={continueRejectReason}
+			/>
+
 			<ConfirmDialog
 				open={Boolean(suspendConfirmState)}
 				title="Suspend Salon"
@@ -746,6 +818,22 @@ export default function AdminSalonsPage() {
 				onConfirm={confirmUnsuspend}
 				onCancel={cancelUnsuspend}
 				loading={processingId === unsuspendConfirmId}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(rejectConfirmState)}
+				title="Reject Salon"
+				message={
+					rejectTargetSalon
+						? `Are you sure you want to reject ${rejectTargetSalon.salonName}? This salon will be moved to the rejected list.`
+						: 'Are you sure you want to reject this salon?'
+				}
+				variant="danger"
+				confirmLabel="Yes, Reject"
+				cancelLabel="Cancel"
+				onConfirm={confirmReject}
+				onCancel={cancelRejectConfirm}
+				loading={processingId === rejectConfirmState?.salonId}
 			/>
 		</>
 	);

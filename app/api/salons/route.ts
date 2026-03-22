@@ -50,17 +50,17 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const validActions = ["activate", "suspend", "unsuspend"];
+    const validActions = ["activate", "suspend", "unsuspend", "reject"];
     if (!validActions.includes(action)) {
       return NextResponse.json(
-        { message: "Invalid action. Must be one of: activate, suspend, unsuspend" },
+        { message: "Invalid action. Must be one of: activate, suspend, unsuspend, reject" },
         { status: 400 }
       );
     }
 
     const requestBody = await req.json().catch(() => ({}));
     const payload =
-      action === "suspend" && typeof requestBody?.reason === "string"
+      (action === "suspend" || action === "reject") && typeof requestBody?.reason === "string"
         ? { reason: requestBody.reason.trim() }
         : {};
 

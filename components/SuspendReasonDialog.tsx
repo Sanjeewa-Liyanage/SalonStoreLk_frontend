@@ -18,6 +18,12 @@ interface SuspendReasonDialogProps {
 	reason: string;
 	error?: string | null;
 	loading?: boolean;
+	title?: string;
+	actionVerb?: string;
+	inputLabel?: string;
+	helperText?: string;
+	confirmLabel?: string;
+	confirmColor?: 'warning' | 'error' | 'primary' | 'info' | 'success';
 	onReasonChange: (value: string) => void;
 	onCancel: () => void;
 	onConfirm: () => void;
@@ -29,6 +35,12 @@ export default function SuspendReasonDialog({
 	reason,
 	error = null,
 	loading = false,
+	title = 'Suspend Salon',
+	actionVerb = 'suspending',
+	inputLabel = 'Suspend Reason',
+	helperText = 'This reason will be sent with the suspend request.',
+	confirmLabel = 'Continue',
+	confirmColor = 'warning',
 	onReasonChange,
 	onCancel,
 	onConfirm,
@@ -60,18 +72,18 @@ export default function SuspendReasonDialog({
 					color: isDark ? '#e2e8f0' : '#1a1d2e',
 				}}
 			>
-				Suspend Salon
+				{title}
 			</DialogTitle>
 			<DialogContent sx={{ pt: 1.5 }}>
 				<Stack spacing={1.5}>
 					<Typography sx={{ color: isDark ? '#8ea0c4' : '#64748b', fontSize: '0.9rem' }}>
 						{salonName
-							? `Enter the reason for suspending ${salonName}.`
-							: 'Enter the reason for suspending this salon.'}
+							? `Enter the reason for ${actionVerb} ${salonName}.`
+							: `Enter the reason for ${actionVerb} this salon.`}
 					</Typography>
 					<TextField
 						autoFocus
-						label="Suspend Reason"
+						label={inputLabel}
 						placeholder="Type the reason"
 						value={reason}
 						onChange={(event) => onReasonChange(event.target.value)}
@@ -79,7 +91,7 @@ export default function SuspendReasonDialog({
 						required
 						fullWidth
 						error={Boolean(error)}
-						helperText={error || 'This reason will be sent with the suspend request.'}
+						helperText={error || helperText}
 						size="small"
 						InputProps={{
 							sx: {
@@ -107,7 +119,7 @@ export default function SuspendReasonDialog({
 				<Button
 					fullWidth
 					variant="contained"
-					color="warning"
+					color={confirmColor}
 					onClick={onConfirm}
 					disabled={loading}
 					sx={{
@@ -116,7 +128,7 @@ export default function SuspendReasonDialog({
 						borderRadius: '8px',
 					}}
 				>
-					Continue
+					{confirmLabel}
 				</Button>
 			</DialogActions>
 		</Dialog>
