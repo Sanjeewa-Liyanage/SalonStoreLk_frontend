@@ -45,6 +45,8 @@ const MENU_ITEMS = [
       { label: 'All Salons', href: '/admin/salons' },
       { label: 'Pending Approval', href: '/admin/salons?tab=pending' },
       { label: 'Active Salons', href: '/admin/salons?tab=active' },
+      { label: 'Suspended Salons', href: '/admin/salons?tab=suspended' },
+      { label: 'Rejected Salons', href: '/admin/salons?tab=rejected' },
     ],
   },
   {

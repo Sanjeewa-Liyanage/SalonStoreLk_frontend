@@ -29,13 +29,10 @@ import {
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import {
-	fetchAllSalons,
-	fetchActiveSalons,
-	fetchPendingSalons,
-	activateSalon,
-} from '@/lib/salonService';
+import { fetchAllSalons, activateSalon, suspendSalon, unsuspendSalon } from '@/lib/salonService';
 import SalonLoader from '@/components/Loader';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import SuspendReasonDialog from '@/components/SuspendReasonDialog';
 
 interface Salon {
 	id: string;
@@ -53,27 +50,19 @@ interface Salon {
 		_nanoseconds: number;
 	};
 }
-type SalonTab = 'all' | 'active' | 'pending';
+
+type SalonTab = 'all' | 'active' | 'pending' | 'suspended'| 'rejected';
 
 const normalizeSalonTab = (value: string | null): SalonTab => {
-	if (value === 'active' || value === 'pending' || value === 'all') return value;
+	if (value === 'active' || value === 'pending' || value === 'all' || value === 'suspended' || value === 'rejected') return value;
 	return 'all';
 };
-
-interface SalonApiResponse {
-	data: Salon[];
-	pagination?: {
-		page: number;
-		limit: number;
-		hasNext: boolean;
-	};
-}
 
 const statusColor = (status: string): 'success' | 'warning' | 'error' | 'default' => {
 	const normalized = status.toUpperCase();
 	if (normalized === 'ACTIVE') return 'success';
 	if (normalized.includes('PENDING')) return 'warning';
-	if (normalized.includes('INACTIVE')) return 'error';
+	if (normalized.includes('REJECTED')) return 'error';
 	return 'default';
 };
 
@@ -82,6 +71,180 @@ const formatDate = (createdAt?: Salon['createdAt']) => {
 	return new Date(createdAt._seconds * 1000).toLocaleDateString();
 };
 
+// ─── Reusable table component to avoid repetition ────────────────────────────
+interface SalonTableProps {
+	salons: Salon[];
+	isDark: boolean;
+	currentTab: SalonTab;
+	showActions?: boolean;
+	processingId?: string | null;
+	onApprove?: (id: string) => void;
+	onReject?: (id: string) => void;
+	onSuspend?: (id: string) => void;
+	onUnsuspend?: (id: string) => void;
+}
+
+const SalonTable = ({
+	salons,
+	isDark,
+	currentTab,
+	showActions = false,
+	processingId,
+	onApprove,
+	onReject,
+	onSuspend,
+	onUnsuspend,
+}: SalonTableProps) => {
+	const headers = showActions
+		? ['Salon Code', 'Name', 'City', 'Phone', 'Created', 'Owner', 'Actions']
+		: ['Salon Code', 'Name', 'City', 'Phone', 'Status', 'Created', 'Owner'];
+
+	const cellSx = (extra?: object) => ({
+		py: 1.6,
+		px: 2,
+		borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
+		fontSize: '0.86rem',
+		color: isDark ? '#cbd5e1' : '#334155',
+		...extra,
+	});
+
+	return (
+		<Box
+			sx={{
+				overflowX: 'auto',
+				borderRadius: '10px',
+				border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
+			}}
+		>
+			<Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', minWidth: 920 }}>
+				<Box component="thead" sx={{ backgroundColor: isDark ? '#0f1322' : '#f8fafc' }}>
+					<Box component="tr">
+						{headers.map((header) => (
+							<Box
+								key={header}
+								component="th"
+								sx={{
+									textAlign: 'left',
+									py: 1.5,
+									px: 2,
+									fontSize: '0.78rem',
+									fontWeight: 700,
+									color: isDark ? '#8ea0c4' : '#64748b',
+									borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
+									whiteSpace: 'nowrap',
+								}}
+							>
+								{header}
+							</Box>
+						))}
+					</Box>
+				</Box>
+
+				<Box component="tbody">
+					{salons.map((salon) => (
+						<Box
+							component="tr"
+							key={salon.id}
+							sx={{
+								'&:hover': {
+									backgroundColor: isDark
+										? 'rgba(167, 139, 250, 0.08)'
+										: 'rgba(167, 139, 250, 0.06)',
+								},
+							}}
+						>
+							<Box component="td" sx={cellSx({ color: isDark ? '#e2e8f0' : '#1a1d2e' })}>
+								{salon.salonCode}
+							</Box>
+							<Box component="td" sx={cellSx({ color: isDark ? '#e2e8f0' : '#1a1d2e', fontWeight: 600 })}>
+								{salon.salonName}
+							</Box>
+							<Box component="td" sx={cellSx()}>
+								{salon.city}
+							</Box>
+							<Box component="td" sx={cellSx()}>
+								{salon.phoneNumber}
+							</Box>
+
+							{/* Status column — only shown when NOT in pending/actions mode */}
+							{!showActions && (
+								<Box component="td" sx={cellSx()}>
+									<Chip
+										size="small"
+										label={salon.status.replaceAll('_', ' ')}
+										color={statusColor(salon.status)}
+										sx={{ textTransform: 'capitalize' }}
+									/>
+								</Box>
+							)}
+
+							<Box component="td" sx={cellSx()}>
+								{formatDate(salon.createdAt)}
+							</Box>
+							<Box component="td" sx={cellSx({ fontSize: '0.78rem', color: isDark ? '#94a3b8' : '#64748b' })}>
+								{salon.ownerId}
+							</Box>
+
+							{/* Actions column — shown in pending, active, and suspended tabs */}
+							{showActions && (
+								<Box component="td" sx={cellSx()}>
+									{currentTab === 'active' ? (
+										<Button
+											size="small"
+											variant="outlined"
+											color="warning"
+											onClick={() => onSuspend?.(salon.id)}
+											disabled={processingId === salon.id}
+											sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+										>
+											{processingId === salon.id ? 'Suspending...' : 'Suspend'}
+										</Button>
+									) : currentTab === 'suspended' ? (
+										<Button
+											size="small"
+											variant="contained"
+											color="info"
+											onClick={() => onUnsuspend?.(salon.id)}
+											disabled={processingId === salon.id}
+											sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+										>
+											{processingId === salon.id ? 'Unsuspending...' : 'Unsuspend'}
+										</Button>
+									) : (
+										<Stack direction="row" spacing={1}>
+											<Button
+												size="small"
+												variant="contained"
+												color="success"
+												onClick={() => onApprove?.(salon.id)}
+												disabled={processingId === salon.id}
+												sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+											>
+												{processingId === salon.id ? 'Approving...' : 'Approve'}
+											</Button>
+											<Button
+												size="small"
+												variant="outlined"
+												color="error"
+												onClick={() => onReject?.(salon.id)}
+												disabled={processingId === salon.id}
+												sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+											>
+												{processingId === salon.id ? 'Rejecting...' : 'Reject'}
+											</Button>
+										</Stack>
+									)}
+								</Box>
+							)}
+						</Box>
+					))}
+				</Box>
+			</Box>
+		</Box>
+	);
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AdminSalonsPage() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -89,51 +252,36 @@ export default function AdminSalonsPage() {
 	const { isDark } = useMuiTheme();
 	const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
-	const [salons, setSalons] = useState<Salon[]>([]);
-	const [activeSalons, setActiveSalons] = useState<Salon[]>([]);
-	const [pendingSalons, setPendingSalons] = useState<Salon[]>([]);
+	// ── Single source of truth: all salons fetched once ──
+	const [allSalons, setAllSalons] = useState<Salon[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
+
+	// ── UI state ──
 	const [search, setSearch] = useState('');
 	const [page, setPage] = useState(1);
-	const [activePage, setActivePage] = useState(1);
-	const [pendingPage, setPendingPage] = useState(1);
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
+	const [suspendReasonDialogId, setSuspendReasonDialogId] = useState<string | null>(null);
+	const [suspendReason, setSuspendReason] = useState('');
+	const [suspendReasonError, setSuspendReasonError] = useState<string | null>(null);
+	const [suspendConfirmState, setSuspendConfirmState] = useState<{ salonId: string; reason: string } | null>(null);
+	const [unsuspendConfirmId, setUnsuspendConfirmId] = useState<string | null>(null);
 
 	const rowsPerPage = 8;
 	const activeTab = normalizeSalonTab(searchParams.get('tab'));
 
-
+	// ── Fetch ONCE on mount — no tab dependency ──
 	useEffect(() => {
 		const loadSalons = async () => {
 			setLoading(true);
 			setError('');
-
 			try {
 				const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-				if (!token) {
-					throw new Error('No access token found. Please login again.');
-				}
+				if (!token) throw new Error('No access token found. Please login again.');
 
-				if (activeTab === 'pending') {
-					const payload = await fetchPendingSalons(token);
-					setPendingSalons(payload.data || []);
-				} else if (activeTab === 'active') {
-					// Fetch all salons and filter for active ones
-					const payload = await fetchAllSalons(token);
-					const allSalons = payload.data || [];
-					const filtered = allSalons.filter((salon: { status: string; }) => salon.status.toUpperCase() === 'ACTIVE');
-					setActiveSalons(filtered);
-				} else {
-					// Fetch all and pending counts for the top cards
-					const [allPayload, pendingPayload] = await Promise.all([
-						fetchAllSalons(token),
-						fetchPendingSalons(token),
-					]);
-					setSalons(allPayload.data || []);
-					setPendingSalons(pendingPayload.data || []);
-				}
+				const payload = await fetchAllSalons(token);
+				setAllSalons(payload.data || []);
 			} catch (fetchError) {
 				setError(fetchError instanceof Error ? fetchError.message : 'Something went wrong');
 			} finally {
@@ -142,90 +290,94 @@ export default function AdminSalonsPage() {
 		};
 
 		loadSalons();
+	}, []); // ← empty array: runs once only
+
+	// ── Reset search + page when tab changes ──
+	useEffect(() => {
+		setSearch('');
+		setPage(1);
 	}, [activeTab]);
 
-	const counts = useMemo(() => {
-		const total = salons.length;
-		const active = salons.filter((salon) => salon.status.toUpperCase() === 'ACTIVE').length;
-		const pending = pendingSalons.length;
-		return { total, active, pending };
-	}, [salons, pendingSalons]);
-
-	const filteredSalons = useMemo(() => {
-		const query = search.toLowerCase().trim();
-		if (!query) return salons;
-
-		return salons.filter((salon) =>
-			salon.salonName.toLowerCase().includes(query) ||
-			salon.salonCode.toLowerCase().includes(query) ||
-			salon.city.toLowerCase().includes(query) ||
-			salon.phoneNumber.toLowerCase().includes(query)
-		);
-	}, [salons, search]);
-
-	const filteredActiveSalons = useMemo(() => {
-		const query = search.toLowerCase().trim();
-		if (!query) return activeSalons;
-
-		return activeSalons.filter((salon) =>
-			salon.salonName.toLowerCase().includes(query) ||
-			salon.salonCode.toLowerCase().includes(query) ||
-			salon.city.toLowerCase().includes(query) ||
-			salon.phoneNumber.toLowerCase().includes(query)
-		);
-	}, [activeSalons, search]);
-
-	const filteredPendingSalons = useMemo(() => {
-		const query = search.toLowerCase().trim();
-		if (!query) return pendingSalons;
-
-		return pendingSalons.filter((salon) =>
-			salon.salonName.toLowerCase().includes(query) ||
-			salon.salonCode.toLowerCase().includes(query) ||
-			salon.city.toLowerCase().includes(query) ||
-			salon.phoneNumber.toLowerCase().includes(query)
-		);
-	}, [pendingSalons, search]);
-
-	const totalPages = Math.max(1, Math.ceil(filteredSalons.length / rowsPerPage));
-	const paginatedSalons = filteredSalons.slice((page - 1) * rowsPerPage, page * rowsPerPage);
-
-	const totalActivePages = Math.max(1, Math.ceil(filteredActiveSalons.length / rowsPerPage));
-	const paginatedActiveSalons = filteredActiveSalons.slice((activePage - 1) * rowsPerPage, activePage * rowsPerPage);
-
-	const totalPendingPages = Math.max(1, Math.ceil(filteredPendingSalons.length / rowsPerPage));
-	const paginatedPendingSalons = filteredPendingSalons.slice(
-		(pendingPage - 1) * rowsPerPage,
-		pendingPage * rowsPerPage
+	// ── Derive filtered lists from allSalons ──
+	const activeSalons = useMemo(
+		() => allSalons.filter((s) => s.status.toUpperCase() === 'ACTIVE'),
+		[allSalons]
 	);
 
-	useEffect(() => {
-		setPage(1);
-		setActivePage(1);
-		setSearch('');
-	}, []);
+	const pendingSalons = useMemo(
+		() => allSalons.filter((s) => s.status.toUpperCase().includes('PENDING')),
+		[allSalons]
+	);
 
-	
+	const suspendedSalons = useMemo(
+		() => allSalons.filter((s) => s.status.toUpperCase() === 'SUSPENDED'),
+		[allSalons]
+	);
+	const rejectedSalons = useMemo(
+		() => allSalons.filter((s) => s.status.toUpperCase() === 'REJECTED'),
+		[allSalons]
+	);
+	// ── Summary counts (always derived from allSalons) ──
+	const counts = useMemo(
+		() => ({
+			total: allSalons.length,
+			active: activeSalons.length,
+			pending: pendingSalons.length,
+			suspended: suspendedSalons.length,
+			rejected: rejectedSalons.length,
+		}),
+		[allSalons, activeSalons, pendingSalons, suspendedSalons, rejectedSalons]
+	);
 
+	// ── Pick the correct list for the active tab ──
+	const currentList = useMemo(() => {
+		switch (activeTab) {
+			case 'active':    return activeSalons;
+			case 'pending':   return pendingSalons;
+			case 'suspended': return suspendedSalons;
+			case 'rejected':  return rejectedSalons;
+
+			default:          return allSalons;
+		}
+	}, [activeTab, allSalons, activeSalons, pendingSalons, suspendedSalons, rejectedSalons]);
+
+	// ── Apply search filter on top of the current list ──
+	const filteredList = useMemo(() => {
+		const query = search.toLowerCase().trim();
+		if (!query) return currentList;
+		return currentList.filter(
+			(s) =>
+				s.salonName.toLowerCase().includes(query) ||
+				s.salonCode.toLowerCase().includes(query) ||
+				s.city.toLowerCase().includes(query) ||
+				s.phoneNumber.toLowerCase().includes(query)
+		);
+	}, [currentList, search]);
+
+	// ── Pagination ──
+	const totalPages = Math.max(1, Math.ceil(filteredList.length / rowsPerPage));
+	const paginatedList = filteredList.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
+	// ── Tab change ──
 	const handleTabChange = (_: SyntheticEvent, value: SalonTab) => {
-		setPage(1);
-		setActivePage(1);
-		setPendingPage(1);
 		const href = value === 'all' ? '/admin/salons' : `/admin/salons?tab=${value}`;
 		router.push(href, { scroll: false });
 	};
 
+	// ── Approve ──
 	const handleApprove = async (salonId: string) => {
 		try {
 			setProcessingId(salonId);
 			setActionError(null);
 			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
-			
+
 			await activateSalon(salonId, token);
-			
-			// Remove the approved salon from the pending list
-			setPendingSalons((prev) => prev.filter((s) => s.id !== salonId));
+
+			// Optimistically update local state — no re-fetch needed
+			setAllSalons((prev) =>
+				prev.map((s) => (s.id === salonId ? { ...s, status: 'ACTIVE', isActive: true } : s))
+			);
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to approve salon.');
 		} finally {
@@ -233,22 +385,132 @@ export default function AdminSalonsPage() {
 		}
 	};
 
+	// ── Reject ──
 	const handleReject = async (salonId: string) => {
 		try {
 			setProcessingId(salonId);
 			setActionError(null);
 			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
-			
-			// TODO: Implement reject/deny endpoint in backend and add service function
-			// For now, just remove from pending list
-			setPendingSalons((prev) => prev.filter((s) => s.id !== salonId));
+
+			// TODO: call reject API endpoint when available
+			// Optimistically update local state
+			setAllSalons((prev) =>
+				prev.map((s) => (s.id === salonId ? { ...s, status: 'REJECTED' } : s))
+			);
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to reject salon.');
 		} finally {
 			setProcessingId(null);
 		}
 	};
+
+	// ── Suspend ──
+	const handleSuspend = async (salonId: string, reason: string) => {
+		try {
+			setProcessingId(salonId);
+			setActionError(null);
+			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			if (!token) throw new Error('No access token found.');
+
+			await suspendSalon(salonId, reason, token);
+
+			setAllSalons((prev) =>
+				prev.map((s) => (s.id === salonId ? { ...s, status: 'SUSPENDED', isActive: false } : s))
+			);
+		} catch (err) {
+			setActionError(err instanceof Error ? err.message : 'Failed to suspend salon.');
+		} finally {
+			setProcessingId(null);
+		}
+	};
+
+	// ── Unsuspend ──
+	const handleUnsuspend = async (salonId: string) => {
+		try {
+			setProcessingId(salonId);
+			setActionError(null);
+			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			if (!token) throw new Error('No access token found.');
+
+			await unsuspendSalon(salonId, token);
+
+			setAllSalons((prev) =>
+				prev.map((s) => (s.id === salonId ? { ...s, status: 'ACTIVE', isActive: true } : s))
+			);
+		} catch (err) {
+			setActionError(err instanceof Error ? err.message : 'Failed to unsuspend salon.');
+		} finally {
+			setProcessingId(null);
+		}
+	};
+
+	const requestSuspend = (salonId: string) => {
+		setSuspendReasonDialogId(salonId);
+		setSuspendReason('');
+		setSuspendReasonError(null);
+		setSuspendConfirmState(null);
+	};
+
+	const requestUnsuspend = (salonId: string) => {
+		setUnsuspendConfirmId(salonId);
+	};
+
+	const cancelSuspendReason = () => {
+		if (processingId) return;
+		setSuspendReasonDialogId(null);
+		setSuspendReasonError(null);
+		setSuspendReason('');
+	};
+
+	const continueSuspendReason = () => {
+		if (!suspendReasonDialogId) return;
+		const trimmedReason = suspendReason.trim();
+		if (!trimmedReason) {
+			setSuspendReasonError('Suspend reason is required.');
+			return;
+		}
+
+		setSuspendReasonError(null);
+		setSuspendConfirmState({ salonId: suspendReasonDialogId, reason: trimmedReason });
+		setSuspendReasonDialogId(null);
+	};
+
+	const cancelSuspendConfirm = () => {
+		if (processingId) return;
+		setSuspendConfirmState(null);
+		setSuspendReason('');
+		setSuspendReasonError(null);
+	};
+
+	const cancelUnsuspend = () => {
+		if (processingId) return;
+		setUnsuspendConfirmId(null);
+	};
+
+	const confirmSuspend = async () => {
+		if (!suspendConfirmState) return;
+		await handleSuspend(suspendConfirmState.salonId, suspendConfirmState.reason);
+		setSuspendConfirmState(null);
+		setSuspendReason('');
+		setSuspendReasonError(null);
+	};
+
+	const confirmUnsuspend = async () => {
+		if (!unsuspendConfirmId) return;
+		await handleUnsuspend(unsuspendConfirmId);
+		setUnsuspendConfirmId(null);
+	};
+
+	const suspendTargetSalon = useMemo(
+		() => allSalons.find((salon) => salon.id === (suspendConfirmState?.salonId ?? suspendReasonDialogId)),
+		[allSalons, suspendConfirmState?.salonId, suspendReasonDialogId]
+	);
+
+	const unsuspendTargetSalon = useMemo(
+		() => allSalons.find((salon) => salon.id === unsuspendConfirmId),
+		[allSalons, unsuspendConfirmId]
+	);
 
 	if (loading) {
 		return (
@@ -267,13 +529,8 @@ export default function AdminSalonsPage() {
 	}
 
 	return (
-		<Box
-			sx={{
-				display: 'flex',
-				minHeight: '100vh',
-				backgroundColor: isDark ? '#0d0f1a' : '#f9fafb',
-			}}
-		>
+		<>
+			<Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: isDark ? '#0d0f1a' : '#f9fafb' }}>
 			{!isMobile && <Sidebar />}
 
 			<Box
@@ -291,20 +548,12 @@ export default function AdminSalonsPage() {
 
 				<Box
 					component="main"
-					sx={{
-						flex: 1,
-						overflow: 'auto',
-						backgroundColor: isDark ? '#0d0f1a' : '#f9fafb',
-					}}
+					sx={{ flex: 1, overflow: 'auto', backgroundColor: isDark ? '#0d0f1a' : '#f9fafb' }}
 				>
-					<Container
-						maxWidth={false}
-						sx={{
-							py: 3,
-							px: { xs: 2, sm: 3, md: 4 },
-						}}
-					>
+					<Container maxWidth={false} sx={{ py: 3, px: { xs: 2, sm: 3, md: 4 } }}>
 						<Stack spacing={3}>
+
+							{/* ── Summary cards ── */}
 							<Box
 								sx={{
 									display: 'grid',
@@ -312,73 +561,37 @@ export default function AdminSalonsPage() {
 									gap: 2,
 								}}
 							>
-								<Card
-									sx={{
-										borderRadius: '12px',
-										backgroundColor: isDark ? '#141828' : '#ffffff',
-										border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-									}}
-								>
-									<CardContent>
-										<Stack direction="row" alignItems="center" justifyContent="space-between">
-											<Box>
-												<Typography sx={{ color: isDark ? '#6b7a99' : '#94a3b8' }} variant="body2">
-													Total Salons
-												</Typography>
-												<Typography sx={{ fontWeight: 700 }} variant="h5">
-													{counts.total}
-												</Typography>
-											</Box>
-											<StorefrontIcon sx={{ color: '#a78bfa' }} />
-										</Stack>
-									</CardContent>
-								</Card>
-
-								<Card
-									sx={{
-										borderRadius: '12px',
-										backgroundColor: isDark ? '#141828' : '#ffffff',
-										border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-									}}
-								>
-									<CardContent>
-										<Stack direction="row" alignItems="center" justifyContent="space-between">
-											<Box>
-												<Typography sx={{ color: isDark ? '#6b7a99' : '#94a3b8' }} variant="body2">
-													Active Salons
-												</Typography>
-												<Typography sx={{ fontWeight: 700 }} variant="h5">
-													{counts.active}
-												</Typography>
-											</Box>
-											<CheckCircleOutlineIcon sx={{ color: '#10b981' }} />
-										</Stack>
-									</CardContent>
-								</Card>
-
-								<Card
-									sx={{
-										borderRadius: '12px',
-										backgroundColor: isDark ? '#141828' : '#ffffff',
-										border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-									}}
-								>
-									<CardContent>
-										<Stack direction="row" alignItems="center" justifyContent="space-between">
-											<Box>
-												<Typography sx={{ color: isDark ? '#6b7a99' : '#94a3b8' }} variant="body2">
-													Pending Approval
-												</Typography>
-												<Typography sx={{ fontWeight: 700 }} variant="h5">
-													{counts.pending}
-												</Typography>
-											</Box>
-											<PendingActionsIcon sx={{ color: '#f59e0b' }} />
-										</Stack>
-									</CardContent>
-								</Card>
+								{[
+									{ label: 'Total Salons',     value: counts.total,   icon: <StorefrontIcon sx={{ color: '#a78bfa' }} /> },
+									{ label: 'Active Salons',    value: counts.active,  icon: <CheckCircleOutlineIcon sx={{ color: '#10b981' }} /> },
+									{ label: 'Pending Approval', value: counts.pending, icon: <PendingActionsIcon sx={{ color: '#f59e0b' }} /> },
+								].map(({ label, value, icon }) => (
+									<Card
+										key={label}
+										sx={{
+											borderRadius: '12px',
+											backgroundColor: isDark ? '#141828' : '#ffffff',
+											border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
+										}}
+									>
+										<CardContent>
+											<Stack direction="row" alignItems="center" justifyContent="space-between">
+												<Box>
+													<Typography sx={{ color: isDark ? '#6b7a99' : '#94a3b8' }} variant="body2">
+														{label}
+													</Typography>
+													<Typography sx={{ fontWeight: 700 }} variant="h5">
+														{value}
+													</Typography>
+												</Box>
+												{icon}
+											</Stack>
+										</CardContent>
+									</Card>
+								))}
 							</Box>
 
+							{/* ── Tab card ── */}
 							<Card
 								sx={{
 									borderRadius: '12px',
@@ -395,451 +608,42 @@ export default function AdminSalonsPage() {
 									<Tabs
 										value={activeTab}
 										onChange={handleTabChange}
-										sx={{
-											'& .MuiTabs-indicator': {
-												backgroundColor: '#a78bfa',
-											},
-										}}
+										sx={{ '& .MuiTabs-indicator': { backgroundColor: '#a78bfa' } }}
 									>
-										<Tab
-											value="all"
-											label="All Salons"
-											sx={{ textTransform: 'none', fontWeight: 600 }}
-										/>
-										<Tab
-											value="active"
-											label="Active Salons"
-											sx={{ textTransform: 'none', fontWeight: 600 }}
-										/>
-										<Tab
-											value="pending"
-											label="Pending Approval"
-											sx={{ textTransform: 'none', fontWeight: 600 }}
-										/>
+										{(['all', 'active', 'pending', 'suspended','rejected'] as SalonTab[]).map((tab) => (
+											<Tab
+												key={tab}
+												value={tab}
+												label={
+													tab === 'all'       ? 'All Salons' :
+													tab === 'active'    ? 'Active Salons' :
+													tab === 'pending'   ? 'Pending Approval' :
+													tab === 'suspended' ? 'Suspended Salons' :
+													'Rejected Salons'
+
+												}
+												sx={{ textTransform: 'none', fontWeight: 600 }}
+											/>
+										))}
 									</Tabs>
 								</Box>
 
 								<CardContent>
-									{activeTab === 'all' && (
-										<Stack spacing={2}>
-											<TextField
-												placeholder="Search by salon name, code, city, or phone number"
-												value={search}
-												onChange={(event) => setSearch(event.target.value)}
-												size="small"
-												fullWidth
-												InputProps={{
-													startAdornment: (
-														<InputAdornment position="start">
-															<SearchIcon
-																sx={{ fontSize: '1rem', color: isDark ? '#6b7a99' : '#94a3b8' }}
-															/>
-														</InputAdornment>
-													),
-												}}
-												sx={{
-													'& .MuiOutlinedInput-root': {
-														borderRadius: '8px',
-														backgroundColor: isDark ? '#0d0f1a' : '#f7f9ff',
-														'& fieldset': {
-															borderColor: isDark ? '#1e2440' : '#eaecf5',
-														},
-													},
-												}}
-											/>
-
-											{error && <Alert severity="error">{error}</Alert>}
-
-											{!loading && !error && paginatedSalons.length === 0 && (
-												<Alert severity="info">No salons found for your search.</Alert>
-											)}
-
-											<Box
-												sx={{
-													overflowX: 'auto',
-													borderRadius: '10px',
-													border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-												}}
-											>
-												<Box
-													component="table"
-													sx={{
-														width: '100%',
-														borderCollapse: 'collapse',
-														minWidth: 920,
-													}}
-												>
-													<Box
-														component="thead"
-														sx={{ backgroundColor: isDark ? '#0f1322' : '#f8fafc' }}
-													>
-														<Box component="tr">
-															{['Salon Code', 'Name', 'City', 'Phone', 'Status', 'Created', 'Owner'].map(
-																(header) => (
-																	<Box
-																		key={header}
-																		component="th"
-																		sx={{
-																			textAlign: 'left',
-																			py: 1.5,
-																			px: 2,
-																			fontSize: '0.78rem',
-																			fontWeight: 700,
-																			color: isDark ? '#8ea0c4' : '#64748b',
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			whiteSpace: 'nowrap',
-																		}}
-																	>
-																		{header}
-																	</Box>
-																)
-															)}
-														</Box>
-													</Box>
-
-													<Box component="tbody">
-														{!loading &&
-															paginatedSalons.map((salon) => (
-																<Box
-																	component="tr"
-																	key={salon.id}
-																	sx={{
-																		'&:hover': {
-																			backgroundColor: isDark
-																				? 'rgba(167, 139, 250, 0.08)'
-																				: 'rgba(167, 139, 250, 0.06)',
-																		},
-																	}}
-																>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#e2e8f0' : '#1a1d2e',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{salon.salonCode}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#e2e8f0' : '#1a1d2e',
-																			fontSize: '0.86rem',
-																			fontWeight: 600,
-																		}}
-																	>
-																		{salon.salonName}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#cbd5e1' : '#334155',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{salon.city}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#cbd5e1' : '#334155',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{salon.phoneNumber}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																		}}
-																	>
-																		<Chip
-																			size="small"
-																			label={salon.status.replaceAll('_', ' ')}
-																			color={statusColor(salon.status)}
-																			sx={{ textTransform: 'capitalize' }}
-																		/>
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#cbd5e1' : '#334155',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{formatDate(salon.createdAt)}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#94a3b8' : '#64748b',
-																			fontSize: '0.78rem',
-																		}}
-																	>
-																		{salon.ownerId}
-																	</Box>
-																</Box>
-															))}
-													</Box>
-												</Box>
-											</Box>
-
-											<Stack direction="row" justifyContent="flex-end">
-												<Pagination
-													page={page}
-													count={totalPages}
-													onChange={(_, nextPage) => setPage(nextPage)}
-													color="primary"
-													shape="rounded"
-													sx={{
-														'& .Mui-selected': {
-															backgroundColor: '#a78bfa !important',
-															color: 'white',
-														},
-													}}
-												/>
-											</Stack>
-										</Stack>
-									)}
-
-									{activeTab === 'active' && (
-										<Stack spacing={2}>
-											<TextField
-												placeholder="Search by salon name, code, city, or phone number"
-												value={search}
-												onChange={(event) => setSearch(event.target.value)}
-												size="small"
-												fullWidth
-												InputProps={{
-													startAdornment: (
-														<InputAdornment position="start">
-															<SearchIcon
-																sx={{ fontSize: '1rem', color: isDark ? '#6b7a99' : '#94a3b8' }}
-															/>
-														</InputAdornment>
-													),
-												}}
-												sx={{
-													'& .MuiOutlinedInput-root': {
-														borderRadius: '8px',
-														backgroundColor: isDark ? '#0d0f1a' : '#f7f9ff',
-														'& fieldset': {
-															borderColor: isDark ? '#1e2440' : '#eaecf5',
-														},
-													},
-												}}
-											/>
-
-											{error && <Alert severity="error">{error}</Alert>}
-
-											{!loading && !error && paginatedActiveSalons.length === 0 && (
-												<Alert severity="info">No active salons found for your search.</Alert>
-											)}
-
-											<Box
-												sx={{
-													overflowX: 'auto',
-													borderRadius: '10px',
-													border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-												}}
-											>
-												<Box
-													component="table"
-													sx={{
-														width: '100%',
-														borderCollapse: 'collapse',
-														minWidth: 920,
-													}}
-												>
-													<Box
-														component="thead"
-														sx={{ backgroundColor: isDark ? '#0f1322' : '#f8fafc' }}
-													>
-														<Box component="tr">
-															{['Salon Code', 'Name', 'City', 'Phone', 'Status', 'Created', 'Owner'].map(
-																(header) => (
-																	<Box
-																		key={header}
-																		component="th"
-																		sx={{
-																			textAlign: 'left',
-																			py: 1.5,
-																			px: 2,
-																			fontSize: '0.78rem',
-																			fontWeight: 700,
-																			color: isDark ? '#8ea0c4' : '#64748b',
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			whiteSpace: 'nowrap',
-																		}}
-																	>
-																		{header}
-																	</Box>
-																)
-															)}
-														</Box>
-													</Box>
-
-													<Box component="tbody">
-														{!loading &&
-															paginatedActiveSalons.map((salon) => (
-																<Box
-																	component="tr"
-																	key={salon.id}
-																	sx={{
-																		'&:hover': {
-																			backgroundColor: isDark
-																				? 'rgba(167, 139, 250, 0.08)'
-																				: 'rgba(167, 139, 250, 0.06)',
-																		},
-																	}}
-																>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#e2e8f0' : '#1a1d2e',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{salon.salonCode}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#e2e8f0' : '#1a1d2e',
-																			fontSize: '0.86rem',
-																			fontWeight: 600,
-																		}}
-																	>
-																		{salon.salonName}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#cbd5e1' : '#334155',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{salon.city}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#cbd5e1' : '#334155',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{salon.phoneNumber}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																		}}
-																	>
-																		<Chip
-																			size="small"
-																			label={salon.status.replaceAll('_', ' ')}
-																			color={statusColor(salon.status)}
-																			sx={{ textTransform: 'capitalize' }}
-																		/>
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#cbd5e1' : '#334155',
-																			fontSize: '0.86rem',
-																		}}
-																	>
-																		{formatDate(salon.createdAt)}
-																	</Box>
-																	<Box
-																		component="td"
-																		sx={{
-																			py: 1.6,
-																			px: 2,
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			color: isDark ? '#94a3b8' : '#64748b',
-																			fontSize: '0.78rem',
-																		}}
-																	>
-																		{salon.ownerId}
-																	</Box>
-																</Box>
-															))}
-													</Box>
-												</Box>
-											</Box>
-
-											<Stack direction="row" justifyContent="flex-end">
-												<Pagination
-													page={activePage}
-													count={totalActivePages}
-													onChange={(_, nextPage) => setActivePage(nextPage)}
-													color="primary"
-													shape="rounded"
-													sx={{
-														'& .Mui-selected': {
-															backgroundColor: '#a78bfa !important',
-															color: 'white',
-														},
-													}}
-												/>
-											</Stack>
-										</Stack>
-									)}
-
-									{activeTab === 'pending' && (
 									<Stack spacing={2}>
+										{/* Search */}
 										<TextField
 											placeholder="Search by salon name, code, city, or phone number"
 											value={search}
-											onChange={(event) => setSearch(event.target.value)}
+											onChange={(e) => {
+												setSearch(e.target.value);
+												setPage(1);
+											}}
 											size="small"
 											fullWidth
 											InputProps={{
 												startAdornment: (
 													<InputAdornment position="start">
-														<SearchIcon
-															sx={{ fontSize: '1rem', color: isDark ? '#6b7a99' : '#94a3b8' }}
-														/>
+														<SearchIcon sx={{ fontSize: '1rem', color: isDark ? '#6b7a99' : '#94a3b8' }} />
 													</InputAdornment>
 												),
 											}}
@@ -847,143 +651,102 @@ export default function AdminSalonsPage() {
 												'& .MuiOutlinedInput-root': {
 													borderRadius: '8px',
 													backgroundColor: isDark ? '#0d0f1a' : '#f7f9ff',
-													'& fieldset': {
-														borderColor: isDark ? '#1e2440' : '#eaecf5',
-													},
+													'& fieldset': { borderColor: isDark ? '#1e2440' : '#eaecf5' },
 												},
 											}}
 										/>
-										{error && <Alert severity="error">{error}</Alert>}
+
+										{error       && <Alert severity="error">{error}</Alert>}
 										{actionError && <Alert severity="error">{actionError}</Alert>}
-										{!loading && !error && paginatedPendingSalons.length === 0 && filteredPendingSalons.length === 0 && (
-											<Alert severity="info">No pending salons found.</Alert>
+
+										{paginatedList.length === 0 ? (
+											<Alert severity="info">
+												{filteredList.length === 0 && search
+													? 'No salons found for your search.'
+													: `No ${activeTab === 'all' ? '' : activeTab + ' '}salons found.`}
+											</Alert>
+										) : (
+											<SalonTable
+												salons={paginatedList}
+												isDark={isDark}
+												currentTab={activeTab}
+												showActions={activeTab === 'pending' || activeTab === 'active' || activeTab === 'suspended'}
+												processingId={processingId}
+												onApprove={handleApprove}
+												onReject={handleReject}
+												onSuspend={requestSuspend}
+												onUnsuspend={requestUnsuspend}
+											/>
 										)}
-										{!loading && !error && paginatedPendingSalons.length === 0 && filteredPendingSalons.length > 0 && (
-											<Alert severity="info">No pending salons found for your search.</Alert>
-										)}
-										{paginatedPendingSalons.length > 0 && (
-											<Box
-												sx={{
-													overflowX: 'auto',
-													borderRadius: '10px',
-													border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-												}}
-											>
-												<Box
-													component="table"
-													sx={{ width: '100%', borderCollapse: 'collapse', minWidth: 920 }}
-												>
-													<Box
-														component="thead"
-														sx={{ backgroundColor: isDark ? '#0f1322' : '#f8fafc' }}
-													>
-														<Box component="tr">
-															{['Salon Code', 'Name', 'City', 'Phone', 'Created', 'Owner', 'Actions'].map(
-																(header) => (
-																	<Box
-																		key={header}
-																		component="th"
-																		sx={{
-																			textAlign: 'left',
-																			py: 1.5,
-																			px: 2,
-																			fontSize: '0.78rem',
-																			fontWeight: 700,
-																			color: isDark ? '#8ea0c4' : '#64748b',
-																			borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
-																			whiteSpace: 'nowrap',
-																		}}
-																	>
-																		{header}
-																	</Box>
-																)
-															)}
-														</Box>
-													</Box>
-													<Box component="tbody">
-														{paginatedPendingSalons.map((salon) => (
-															<Box
-																component="tr"
-																key={salon.id}
-																sx={{
-																	'&:hover': {
-																		backgroundColor: isDark
-																			? 'rgba(167, 139, 250, 0.08)'
-																			: 'rgba(167, 139, 250, 0.06)',
-																	},
-																}}
-															>
-																<Box component="td" sx={{ py: 1.6, px: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`, fontSize: '0.86rem', color: isDark ? '#e2e8f0' : '#1a1d2e' }}>
-																	{salon.salonCode}
-																</Box>
-																<Box component="td" sx={{ py: 1.6, px: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`, fontSize: '0.86rem', fontWeight: 600, color: isDark ? '#e2e8f0' : '#1a1d2e' }}>
-																	{salon.salonName}
-																</Box>
-																<Box component="td" sx={{ py: 1.6, px: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`, fontSize: '0.86rem', color: isDark ? '#cbd5e1' : '#334155' }}>
-																	{salon.city}
-																</Box>
-																<Box component="td" sx={{ py: 1.6, px: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`, fontSize: '0.86rem', color: isDark ? '#cbd5e1' : '#334155' }}>
-																	{salon.phoneNumber}
-																</Box>
-																<Box component="td" sx={{ py: 1.6, px: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`, fontSize: '0.86rem', color: isDark ? '#cbd5e1' : '#334155' }}>
-																	{formatDate(salon.createdAt)}
-																</Box>
-																<Box component="td" sx={{ py: 1.6, px: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`, fontSize: '0.78rem', color: isDark ? '#94a3b8' : '#64748b' }}>
-																	{salon.ownerId}
-																</Box>
-																<Box component="td" sx={{ py: 1.6, px: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
-																	<Stack direction="row" spacing={1}>
-																		<Button
-																			size="small"
-																			variant="contained"
-																			color="success"
-																			onClick={() => handleApprove(salon.id)}
-																			disabled={processingId === salon.id}
-																			sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-																		>
-																			{processingId === salon.id ? 'Approving...' : 'Approve'}
-																		</Button>
-																		<Button
-																			size="small"
-																			variant="outlined"
-																			color="error"
-																			onClick={() => handleReject(salon.id)}
-																			disabled={processingId === salon.id}
-																			sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-																		>
-																			{processingId === salon.id ? 'Rejecting...' : 'Reject'}
-																		</Button>
-																	</Stack>
-																</Box>
-															</Box>
-														))}
-													</Box>
-												</Box>
-											</Box>
-										)}
+
+										{/* Pagination */}
 										<Stack direction="row" justifyContent="flex-end">
 											<Pagination
-												page={pendingPage}
-												count={totalPendingPages}
-												onChange={(_, nextPage) => setPendingPage(nextPage)}
+												page={page}
+												count={totalPages}
+												onChange={(_, nextPage) => setPage(nextPage)}
 												color="primary"
 												shape="rounded"
-												sx={{
-													'& .Mui-selected': {
-														backgroundColor: '#a78bfa !important',
-														color: 'white',
-													},
-												}}
+												sx={{ '& .Mui-selected': { backgroundColor: '#a78bfa !important', color: 'white' } }}
 											/>
 										</Stack>
 									</Stack>
-									)}
 								</CardContent>
 							</Card>
+
 						</Stack>
 					</Container>
 				</Box>
 			</Box>
-		</Box>
+			</Box>
+
+			<SuspendReasonDialog
+				open={Boolean(suspendReasonDialogId)}
+				salonName={suspendTargetSalon?.salonName}
+				reason={suspendReason}
+				error={suspendReasonError}
+				loading={Boolean(processingId)}
+				onReasonChange={(value) => {
+					setSuspendReason(value);
+					if (suspendReasonError) {
+						setSuspendReasonError(null);
+					}
+				}}
+				onCancel={cancelSuspendReason}
+				onConfirm={continueSuspendReason}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(suspendConfirmState)}
+				title="Suspend Salon"
+				message={
+					suspendTargetSalon
+						? `Are you sure you want to suspend ${suspendTargetSalon.salonName}? This salon will be moved to the suspended list.`
+						: 'Are you sure you want to suspend this salon?'
+				}
+				variant="warning"
+				confirmLabel="Yes, Suspend"
+				cancelLabel="Cancel"
+				onConfirm={confirmSuspend}
+				onCancel={cancelSuspendConfirm}
+				loading={processingId === suspendConfirmState?.salonId}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(unsuspendConfirmId)}
+				title="Unsuspend Salon"
+				message={
+					unsuspendTargetSalon
+						? `Are you sure you want to unsuspend ${unsuspendTargetSalon.salonName}? This salon will be moved to the active list.`
+						: 'Are you sure you want to unsuspend this salon?'
+				}
+				variant="info"
+				confirmLabel="Yes, Unsuspend"
+				cancelLabel="Cancel"
+				onConfirm={confirmUnsuspend}
+				onCancel={cancelUnsuspend}
+				loading={processingId === unsuspendConfirmId}
+			/>
+		</>
 	);
 }
