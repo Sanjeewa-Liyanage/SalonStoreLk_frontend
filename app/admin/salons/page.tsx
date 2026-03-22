@@ -29,10 +29,11 @@ import {
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { fetchAllSalons, activateSalon, rejectSalon, suspendSalon, unsuspendSalon } from '@/lib/salonService';
+import { fetchAllSalons, activateSalon, rejectSalon, suspendSalon, unsuspendSalon, fetchSalonDetails } from '@/lib/salonService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SuspendReasonDialog from '@/components/SuspendReasonDialog';
+import SalonViewDialog from '@/components/SalonViewDialog';
 
 interface Salon {
 	id: string;
@@ -44,7 +45,7 @@ interface Salon {
 	phoneNumber: string;
 	status: string;
 	isActive: boolean;
-	ownerId: string;
+	ownerName: string;
 	createdAt?: {
 		_seconds: number;
 		_nanoseconds: number;
@@ -78,6 +79,7 @@ interface SalonTableProps {
 	currentTab: SalonTab;
 	showActions?: boolean;
 	processingId?: string | null;
+	onView?: (id: string) => void;
 	onApprove?: (id: string) => void;
 	onReject?: (id: string) => void;
 	onSuspend?: (id: string) => void;
@@ -90,6 +92,7 @@ const SalonTable = ({
 	currentTab,
 	showActions = false,
 	processingId,
+	onView,
 	onApprove,
 	onReject,
 	onSuspend,
@@ -145,7 +148,9 @@ const SalonTable = ({
 						<Box
 							component="tr"
 							key={salon.id}
+							onClick={() => !showActions && onView?.(salon.id)}
 							sx={{
+								cursor: !showActions ? 'pointer' : 'default',
 								'&:hover': {
 									backgroundColor: isDark
 										? 'rgba(167, 139, 250, 0.08)'
@@ -182,7 +187,7 @@ const SalonTable = ({
 								{formatDate(salon.createdAt)}
 							</Box>
 							<Box component="td" sx={cellSx({ fontSize: '0.78rem', color: isDark ? '#94a3b8' : '#64748b' })}>
-								{salon.ownerId}
+								{salon.ownerName}
 							</Box>
 
 							{/* Actions column — shown in pending, active, and suspended tabs */}
@@ -271,6 +276,13 @@ export default function AdminSalonsPage() {
 	const [rejectReasonError, setRejectReasonError] = useState<string | null>(null);
 	const [rejectConfirmState, setRejectConfirmState] = useState<{ salonId: string; reason: string } | null>(null);
 	const [unsuspendConfirmId, setUnsuspendConfirmId] = useState<string | null>(null);
+
+	// ── View dialog state ──
+	const [viewDialogOpen, setViewDialogOpen] = useState(false);
+	const [selectedSalonId, setSelectedSalonId] = useState<string | null>(null);
+	const [salonDetails, setSalonDetails] = useState<any>(null);
+	const [loadingDialog, setLoadingDialog] = useState(false);
+	const [dialogError, setDialogError] = useState<string | null>(null);
 
 	const rowsPerPage = 8;
 	const activeTab = normalizeSalonTab(searchParams.get('tab'));
@@ -563,6 +575,33 @@ export default function AdminSalonsPage() {
 		[allSalons, rejectConfirmState?.salonId, rejectReasonDialogId]
 	);
 
+	// ── View salon dialog handlers ──
+	const handleViewSalon = async (salonId: string) => {
+		try {
+			setSelectedSalonId(salonId);
+			setViewDialogOpen(true);
+			setLoadingDialog(true);
+			setDialogError(null);
+
+			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			if (!token) throw new Error('No access token found.');
+
+			const details = await fetchSalonDetails(salonId, token);
+			setSalonDetails(details.data || details);
+		} catch (err) {
+			setDialogError(err instanceof Error ? err.message : 'Failed to load salon details');
+		} finally {
+			setLoadingDialog(false);
+		}
+	};
+
+	const handleCloseViewDialog = () => {
+		setViewDialogOpen(false);
+		setSelectedSalonId(null);
+		setSalonDetails(null);
+		setDialogError(null);
+	};
+
 	if (loading) {
 		return (
 			<Box
@@ -723,6 +762,7 @@ export default function AdminSalonsPage() {
 												currentTab={activeTab}
 												showActions={activeTab === 'pending' || activeTab === 'active' || activeTab === 'suspended'}
 												processingId={processingId}
+												onView={handleViewSalon}
 												onApprove={handleApprove}
 												onReject={requestReject}
 												onSuspend={requestSuspend}
@@ -834,6 +874,13 @@ export default function AdminSalonsPage() {
 				onConfirm={confirmReject}
 				onCancel={cancelRejectConfirm}
 				loading={processingId === rejectConfirmState?.salonId}
+			/>
+
+			<SalonViewDialog
+				open={viewDialogOpen}
+				salon={salonDetails}
+				loading={loadingDialog}
+				onClose={handleCloseViewDialog}
 			/>
 		</>
 	);

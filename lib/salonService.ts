@@ -49,6 +49,24 @@ export const fetchActiveSalons = (token: string) => salonRequest({ type: "active
 export const fetchPendingSalons = (token: string) => salonRequest({ type: "pending" }, token);
 export const fetchSalonById    = (id: string, token: string) => salonRequest({ type: "by-id", id }, token);
 
+// Fetch full salon details by ID from the dedicated endpoint
+export const fetchSalonDetails = async (id: string, accessToken: string) => {
+  try {
+    const { data } = await axios.get(`/api/salons/${id}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return data;
+  } catch (error: any) {
+    if (error?.response?.status !== 401) throw error;
+
+    const nextAccessToken = await refreshAccessToken();
+    const { data } = await axios.get(`/api/salons/${id}`, {
+      headers: { Authorization: `Bearer ${nextAccessToken}` },
+    });
+    return data;
+  }
+};
+
 
 // Salon action endpoints
 export const activateSalon = (id: string, token: string) => salonPatchRequest({ action: "activate", id }, token);
