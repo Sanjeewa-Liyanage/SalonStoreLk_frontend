@@ -21,9 +21,14 @@ async function salonRequest(params: Record<string, string>, accessToken: string)
 }
 
 async function salonPatchRequest(params: Record<string, string>, accessToken: string) {
-  const query = new URLSearchParams(params).toString();
+  const reason = params.reason;
+  const requestParams = { ...params };
+  delete requestParams.reason;
+
+  const body = params.action === 'suspend' && reason ? { reason } : {};
+  const query = new URLSearchParams(requestParams).toString();
   try {
-    const { data } = await axios.patch(`/api/salons?${query}`, {}, {
+	const { data } = await axios.patch(`/api/salons?${query}`, body, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return data;
@@ -31,7 +36,7 @@ async function salonPatchRequest(params: Record<string, string>, accessToken: st
     if (error?.response?.status !== 401) throw error;
 
     const nextAccessToken = await refreshAccessToken();
-    const { data } = await axios.patch(`/api/salons?${query}`, {}, {
+	const { data } = await axios.patch(`/api/salons?${query}`, body, {
       headers: { Authorization: `Bearer ${nextAccessToken}` },
     });
     return data;
@@ -43,7 +48,9 @@ export const fetchActiveSalons = (token: string) => salonRequest({ type: "active
 export const fetchPendingSalons = (token: string) => salonRequest({ type: "pending" }, token);
 export const fetchSalonById    = (id: string, token: string) => salonRequest({ type: "by-id", id }, token);
 
+
 // Salon action endpoints
 export const activateSalon = (id: string, token: string) => salonPatchRequest({ action: "activate", id }, token);
-export const suspendSalon = (id: string, token: string) => salonPatchRequest({ action: "suspend", id }, token);
+export const suspendSalon = (id: string, reason: string, token: string) =>
+  salonPatchRequest({ action: "suspend", id, reason }, token);
 export const unsuspendSalon = (id: string, token: string) => salonPatchRequest({ action: "unsuspend", id }, token);

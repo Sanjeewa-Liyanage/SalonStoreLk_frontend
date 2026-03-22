@@ -58,8 +58,14 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    const requestBody = await req.json().catch(() => ({}));
+    const payload =
+      action === "suspend" && typeof requestBody?.reason === "string"
+        ? { reason: requestBody.reason.trim() }
+        : {};
+
     const endpoint = `/salon/${action}/${id}`;
-    const { data } = await apiClient.patch(endpoint, {}, { headers });
+    const { data } = await apiClient.patch(endpoint, payload, { headers });
     return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
     const status = error?.response?.status || 500;
