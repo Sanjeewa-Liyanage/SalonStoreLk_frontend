@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { WhatsApp, Instagram, Facebook, Email } from '@mui/icons-material';
-import { ChevronDown, Menu, Search, X, User, LogOut, Settings, Check } from 'lucide-react';
+import { ChevronDown, Menu, Search, X, User, LogOut, Settings, Check,  } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
-
+import Link from 'next/link';
 type AuthUser = {
   name: string;
   avatarUrl?: string;
@@ -24,6 +25,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onNavigate, currentPage = 'home', user = null }: HeaderProps) {
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -109,14 +111,15 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
     if (!user) {
       return (
         <button
-          onClick={() => onNavigate?.('signin')}
+          onClick={() => router.push('/login')}
+          
           className="flex items-center gap-2 bg-black/10 hover:bg-black/20 border border-black/20 text-black text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
         >
           <User size={15} />
           Sign In
         </button>
       );
-    }
+    } 
 
     return (
       <div className="relative" ref={userMenuRef}>
@@ -325,7 +328,7 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
                 <LangButton refProp={mobileLangRef} above />
                 {!user ? (
                   <button
-                    onClick={() => { onNavigate?.('signin'); setIsMenuOpen(false); }}
+                    onClick={() => { router.push('/login'); setIsMenuOpen(false); }}
                     className="flex items-center gap-1.5 bg-[#D4A017] text-black text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-400 transition-colors"
                   >
                     <User size={14} />
