@@ -69,6 +69,27 @@ export const fetchSalonDetails = async (id: string, accessToken: string) => {
   }
 };
 
+
+export async function createSalon(salonData: any) {
+  const token = localStorage.getItem("accessToken");
+  
+  try {
+    const { data } = await axios.post("/api/salons/create", salonData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch (error: any) {
+    // If token expired (401), refresh and retry
+    if (error?.response?.status !== 401) throw error;
+
+    const nextAccessToken = await refreshAccessToken();
+    const { data } = await axios.post("/api/salons/create", salonData, {
+      headers: { Authorization: `Bearer ${nextAccessToken}` },
+    });
+    return data;
+  }
+}
+
 // export async function fetchByOwner(accessToken: string){
 //   const client = axios.create(
 //     {

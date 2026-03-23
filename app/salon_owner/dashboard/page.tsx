@@ -22,33 +22,37 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/context/AuthContext";
+import AddSalonDialog from "@/components/AddSalonDialog";
 
 export default function SalonDashboard() {
   const [salons, setSalons] = useState<any[]>([]);
   const [currentSalon, setCurrentSalon] = useState<string>("Elegant Hair Studio");
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const { user } = useAuth();
+
+  // Fetch salons function
+  const loadSalons = async () => {
+    try {
+      const accessToken = sessionStorage.getItem("accessToken");
+      if (accessToken) {
+        const data = await fetchByOwner(accessToken);
+        console.log("Fetched salons data:", data);
+        setSalons(data || []);
+        // Set the first salon as current if available
+        if (data && data.length > 0) {
+          setCurrentSalon(data[0].salonName);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching salons:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch salons on component mount
   useEffect(() => {
-    const loadSalons = async () => {
-      try {
-        const accessToken = sessionStorage.getItem("accessToken");
-        if (accessToken) {
-          const data = await fetchByOwner(accessToken);
-          console.log("Fetched salons data:", data);
-          setSalons(data || []);
-          // Set the first salon as current if available
-          if (data && data.length > 0) {
-            setCurrentSalon(data[0].salonName);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching salons:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadSalons();
   }, []);
 
@@ -207,7 +211,10 @@ export default function SalonDashboard() {
                   Manage your salons and ads in one place
                 </p>
               </div>
-              <Button className="bg-[#C8A84B] hover:bg-[#B39740] text-black font-semibold text-sm md:text-base w-full md:w-auto">
+              <Button 
+                onClick={() => setDialogOpen(true)}
+                className="bg-[#C8A84B] hover:bg-[#B39740] text-black font-semibold text-sm md:text-base w-full md:w-auto"
+              >
                 + Register New Salon
               </Button>
             </div>
@@ -397,6 +404,11 @@ export default function SalonDashboard() {
         </div>
       </div>
     </div>
+    <AddSalonDialog 
+      open={dialogOpen} 
+      onOpenChange={setDialogOpen} 
+      onSuccess={() => loadSalons()} 
+    />
     </AuthGuard>
   );
 }
