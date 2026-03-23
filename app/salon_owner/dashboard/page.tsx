@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarSalon from "@/components/SidebarSalon";
 import HeaderSalon from "@/components/HeaderSalon";
 import { MoreVertical, Eye, Heart, MessageCircle, TrendingUp, ChevronDown, Menu, X } from "lucide-react";
+import { fetchByOwner } from "@/lib/salonService";
 import {
   Card,
   CardContent,
@@ -22,6 +23,33 @@ import {
 import AuthGuard from "@/components/AuthGuard";
 
 export default function SalonDashboard() {
+  const [salons, setSalons] = useState<any[]>([]);
+  const [currentSalon, setCurrentSalon] = useState<string>("Elegant Hair Studio");
+  const [loading, setLoading] = useState(true);
+
+  // Fetch salons on component mount
+  useEffect(() => {
+    const loadSalons = async () => {
+      try {
+        const accessToken = sessionStorage.getItem("accessToken");
+        if (accessToken) {
+          const data = await fetchByOwner(accessToken);
+          console.log("Fetched salons data:", data);
+          setSalons(data || []);
+          // Set the first salon as current if available
+          if (data && data.length > 0) {
+            setCurrentSalon(data[0].salonName);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching salons:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSalons();
+  }, []);
+
   // Dummy data for stats
   const stats = [
     {
@@ -199,23 +227,29 @@ export default function SalonDashboard() {
                         <ChevronDown size={16} />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem className="cursor-pointer text-gray-900">
-                        Elegant Hair Studio
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer text-gray-900">
-                        Luxury Nails Salon
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer text-gray-900">
-                        Spa & Wellness Center
-                      </DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="w-56 bg-white text-black border border-gray-200 shadow-lg">
+                      {salons.length > 0 ? (
+                        salons.map((salon) => (
+                          <DropdownMenuItem
+                            key={salon.id}
+                            className="cursor-pointer text-gray-900"
+                            onClick={() => setCurrentSalon(salon.salonName)}
+                          >
+                            {salon.salonName}
+                          </DropdownMenuItem>
+                        ))
+                      ) : (
+                        <DropdownMenuItem disabled className="text-gray-500">
+                          No salons available
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent>
                 <h3 className="text-2xl font-playfair font-bold text-gray-900">
-                  Elegant Hair Studio
+                  {currentSalon}
                 </h3>
               </CardContent>
             </Card>

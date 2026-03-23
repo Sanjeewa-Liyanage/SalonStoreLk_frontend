@@ -7,6 +7,7 @@ const SALON_ENDPOINTS: Record<string, string> = {
   active: "/salon/active",
   pending:"/salon/pending",
   "by-id": "/salon",   // will append /:id below
+  "by-owner": "/salon/owner",
 };
 
 export async function GET(req: NextRequest) {

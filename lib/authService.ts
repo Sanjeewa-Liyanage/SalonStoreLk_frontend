@@ -1,21 +1,32 @@
 import axios from "axios";
 
 export async function loginUser(email: string, password: string) {
-  const { data } = await axios.post("/api/auth/login", { email, password });
+  const client = axios.create({
+    baseURL: typeof window !== "undefined" ? window.location.origin : "",
+  });
+  const { data } = await client.post("/api/auth/login", { email, password });
   return data;
 }
 export function RegisterUser(payload: any){
-    const data = axios.post("/api/auth/register", payload);
+    const client = axios.create({
+      baseURL: typeof window !== "undefined" ? window.location.origin : "",
+    });
+    const data = client.post("/api/auth/register", payload);
     return data;
 }
 
+
 export async function getUserProfile(accessToken: string) {
-  const { data } = await axios.get("/api/user/me", {
+  const client = axios.create({
+    baseURL: typeof window !== "undefined" ? window.location.origin : "",
+  });
+  const { data } = await client.get("/api/user/me", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   console.log("User profile data:", data); // Debug log
   return data;
 }
+
 export async function refreshAccessToken() {
     const refreshToken = sessionStorage.getItem("refreshToken");
 
@@ -24,7 +35,11 @@ export async function refreshAccessToken() {
         
     }
 
-    const { data } = await axios.post(
+    const client = axios.create({
+      baseURL: typeof window !== "undefined" ? window.location.origin : "",
+    });
+
+    const { data } = await client.post(
         "/api/auth/refresh",
         {},
         {
