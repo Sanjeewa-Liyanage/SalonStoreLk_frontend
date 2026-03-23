@@ -35,6 +35,8 @@ export default function LoginPage() {
         router.push("/admin/dashboard");
         
         return;
+      }else if(userProfile.role === "SALON_OWNER"){
+        router.push("/salon_owner/dashboard");
       }
       
       
