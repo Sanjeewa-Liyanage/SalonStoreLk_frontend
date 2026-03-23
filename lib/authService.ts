@@ -17,7 +17,7 @@ export async function getUserProfile(accessToken: string) {
   return data;
 }
 export async function refreshAccessToken() {
-    const refreshToken = localStorage.getItem("refreshToken");
+    const refreshToken = sessionStorage.getItem("refreshToken");
 
     if (!refreshToken) {
         throw new Error("No refresh token found. Please login again.");
@@ -38,8 +38,8 @@ export async function refreshAccessToken() {
         throw new Error("Invalid refresh response");
     }
 
-    localStorage.setItem("accessToken", data.accessToken);
-    localStorage.setItem("refreshToken", data.refreshToken);
+    sessionStorage.setItem("accessToken", data.accessToken);
+    sessionStorage.setItem("refreshToken", data.refreshToken);
 
     return data.accessToken as string;
 }

@@ -8,6 +8,7 @@ import Charts from '@/components/Charts';
 import RecentSalons from '@/components/RecentSalons';
 import RightPanel from '@/components/RightPanel';
 import { useMuiTheme } from '@/context/MuiThemeContext';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function DashboardPage() {
   const muiTheme = useTheme();
@@ -15,6 +16,7 @@ export default function DashboardPage() {
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
   return (
+    <AuthGuard allowedRole="ADMIN">
     <Box
       sx={{
         display: 'flex',
@@ -86,5 +88,6 @@ export default function DashboardPage() {
         </Box>
       </Box>
     </Box>
+    </AuthGuard>
   );
 }

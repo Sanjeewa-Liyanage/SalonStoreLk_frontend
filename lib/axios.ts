@@ -8,7 +8,7 @@ const apiClient = axios.create({
 });
 
 async function refreshTokens() {
-  const refreshToken = localStorage.getItem("refreshToken");
+  const refreshToken = sessionStorage.getItem("refreshToken");
 
   if (!refreshToken) {
     throw new Error("No refresh token available");
@@ -30,16 +30,16 @@ async function refreshTokens() {
     throw new Error("Invalid refresh token response");
   }
 
-  localStorage.setItem("accessToken", accessToken);
-  localStorage.setItem("refreshToken", nextRefreshToken);
+  sessionStorage.setItem("accessToken", accessToken);
+  sessionStorage.setItem("refreshToken", nextRefreshToken);
 
   return accessToken;
 }
 
 apiClient.interceptors.request.use((config) => {
-  // Only access localStorage on the client side
+  // Only access sessionStorage on the client side
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("accessToken");
+    const token = sessionStorage.getItem("accessToken");
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
@@ -63,8 +63,8 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
 
       } catch (refreshErr) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
+        sessionStorage.removeItem("accessToken");
+        sessionStorage.removeItem("refreshToken");
         window.location.href = "/login";
         return Promise.reject(refreshErr);
       }

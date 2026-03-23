@@ -24,12 +24,12 @@ export default function LoginPage() {
       const data = await loginUser(email, password);
 
       // Store tokens from backend response
-      localStorage.setItem("accessToken", data.backendTokens.accessToken);
-      localStorage.setItem("refreshToken", data.backendTokens.refreshToken);
+      sessionStorage.setItem("accessToken", data.backendTokens.accessToken);
+      sessionStorage.setItem("refreshToken", data.backendTokens.refreshToken);
 
       // Fetch full user profile using the access token
       const userProfile = await getUserProfile(data.backendTokens.accessToken);
-      localStorage.setItem("user", JSON.stringify(userProfile));
+      sessionStorage.setItem("user", JSON.stringify(userProfile));
       console.log("User profile after login:", userProfile);
       if(userProfile.role === "ADMIN" && userProfile.adminLevel==="SUPER") {
         router.push("/admin/dashboard");
