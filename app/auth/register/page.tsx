@@ -3,14 +3,19 @@
 import { useState } from "react";
 import { Google } from '@mui/icons-material';
 import { User, Scissors } from 'lucide-react';
+import { useRouter } from "next/navigation"; // For redirection
+import { RegisterUser } from "@/lib/authService";
+import { toast } from "sonner";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [accountType, setAccountType] = useState<"customer" | "salon">("customer");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -23,10 +28,27 @@ export default function RegisterPage() {
       setPasswordMismatch(true);
       return;
     }
-    setPasswordMismatch(false);
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsLoading(false);
+    try{
+      const payload ={
+        email,
+        password,
+        firstName,
+        lastName,
+        phoneNumber,
+        accountType,
+        role: accountType === "salon" ? "SALON_OWNER" : "CUSTOMER",
+      };
+      await RegisterUser(payload);
+      toast.success("Account created successfully! Please log in.");
+      router.push("/login");
+      
+      
+    }catch (error: any) {
+      toast.error("Failed to create account. Please try again.");
+    }finally{
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -216,6 +238,22 @@ export default function RegisterPage() {
                     style={{ border: "1.5px solid #ede5d6", fontFamily: "inherit" }}
                   />
                 </div>
+              </div>
+              {/* Phone Number */}
+              <div className="mb-5">
+                <label htmlFor="phoneNumber" className="block text-xs font-medium uppercase tracking-widest text-black mb-2">
+                  Phone Number
+                </label>
+                <input
+                  id="phoneNumber"
+                  type="tel"
+                  placeholder="+94773344555"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  required
+                  className="input-field w-full px-4 py-3.5 bg-white rounded-lg text-sm text-black transition-all"
+                  style={{ border: "1.5px solid #ede5d6", fontFamily: "inherit" }}
+                />
               </div>
 
               {/* Email */}
