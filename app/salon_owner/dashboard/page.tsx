@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function SalonDashboard() {
   // Dummy data for stats
@@ -139,6 +140,7 @@ export default function SalonDashboard() {
   };
 
   return (
+    <AuthGuard allowedRole="SALON_OWNER">
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <SidebarSalon />
@@ -345,5 +347,6 @@ export default function SalonDashboard() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   );
 }
