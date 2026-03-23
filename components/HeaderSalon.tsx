@@ -9,7 +9,8 @@ import {
   ChevronDown, 
   User, 
   Settings, 
-  LogOut 
+  LogOut,
+  Menu
 } from "lucide-react";
 import { useMuiTheme } from "@/context/MuiThemeContext";
 import {
@@ -22,13 +23,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-export default function HeaderSalon() {
+export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean, setSidebarOpen: (open: boolean) => void }) {
   const { isDark, toggleTheme } = useMuiTheme();
 
   return (
-    <header className="h-20 bg-white border-b border-neutral-200 flex items-center justify-between px-8 sticky top-0 z-30">
+    <header className="h-16 md:h-20 bg-white border-b border-neutral-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30">
+      {/* Hamburger Menu for Mobile */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="md:hidden p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition-colors"
+        title="Toggle Menu"
+      >
+        <Menu size={24} />
+      </button>
+
       {/* Search Bar */}
-      <div className="relative w-96">
+      <div className="hidden md:block relative flex-grow max-w-md">
         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
           <Search size={18} />
         </span>
@@ -40,7 +50,7 @@ export default function HeaderSalon() {
       </div>
 
       {/* Right Actions */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 md:gap-6">
         {/* Theme Toggle */}
         <button 
           onClick={toggleTheme}
@@ -56,22 +66,22 @@ export default function HeaderSalon() {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
         </button>
 
-        <div className="h-8 w-[1px] bg-neutral-200 mx-2"></div>
+        <div className="hidden md:block h-8 w-[1px] bg-neutral-200 mx-2"></div>
 
         {/* User Dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-3 hover:bg-neutral-50 p-1.5 rounded-lg transition-colors focus:outline-none">
-            <Avatar className="h-9 w-9 border border-[#C8A84B]/30">
+          <DropdownMenuTrigger className="flex items-center gap-2 md:gap-3 hover:bg-neutral-50 p-1.5 rounded-lg transition-colors focus:outline-none">
+            <Avatar className="h-8 md:h-9 w-8 md:w-9 border border-[#C8A84B]/30">
               <AvatarImage src="" alt="Owner" />
               <AvatarFallback className="bg-[#C8A84B]/10 text-[#C8A84B] text-xs font-bold">
                 SO
               </AvatarFallback>
             </Avatar>
             <div className="text-left hidden sm:block">
-              <p className="text-sm font-semibold text-black leading-none">Salon Owner</p>
-              <p className="text-[11px] text-neutral-500 mt-1 uppercase tracking-tighter">Premium Plan</p>
+              <p className="text-xs md:text-sm font-semibold text-black leading-none">Salon Owner</p>
+              <p className="text-[10px] md:text-[11px] text-neutral-500 mt-1 uppercase tracking-tighter">Premium Plan</p>
             </div>
-            <ChevronDown size={14} className="text-neutral-400" />
+            <ChevronDown size={14} className="text-neutral-400 hidden md:block" />
           </DropdownMenuTrigger>
           
           <DropdownMenuContent align="end" className="w-56 mt-2">

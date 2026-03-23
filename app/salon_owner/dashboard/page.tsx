@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import SidebarSalon from "@/components/SidebarSalon";
 import HeaderSalon from "@/components/HeaderSalon";
-import { MoreVertical, Eye, Heart, MessageCircle, TrendingUp, ChevronDown } from "lucide-react";
+import { MoreVertical, Eye, Heart, MessageCircle, TrendingUp, ChevronDown, Menu, X } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -126,6 +126,8 @@ export default function SalonDashboard() {
     },
   ];
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Active":
@@ -142,36 +144,48 @@ export default function SalonDashboard() {
   return (
     <AuthGuard allowedRole="SALON_OWNER">
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <SidebarSalon />
+      {/* Sidebar - Hidden on mobile, visible on md and above */}
+      <div className="hidden md:block">
+        <SidebarSalon />
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+          <div className="absolute inset-y-0 left-0 w-64 z-50">
+            <SidebarSalon />
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <HeaderSalon />
+        <HeaderSalon sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         {/* Page Content */}
         <div className="flex-1 overflow-auto">
-          <div className="p-8">
+          <div className="p-4 md:p-8">
             {/* Welcome Section */}
-            <div className="flex justify-between items-start mb-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
               <div>
-                <h1 className="text-4xl font-playfair font-bold text-gray-900">
+                <h1 className="text-2xl md:text-4xl font-playfair font-bold text-gray-900">
                   Welcome back, Amal
                 </h1>
-                <p className="text-gray-500 mt-1">
+                <p className="text-gray-500 mt-1 text-sm md:text-base">
                   Manage your salons and ads in one place
                 </p>
               </div>
-              <Button className="bg-[#C8A84B] hover:bg-[#B39740] text-black font-semibold">
+              <Button className="bg-[#C8A84B] hover:bg-[#B39740] text-black font-semibold text-sm md:text-base w-full md:w-auto">
                 + Register New Salon
               </Button>
             </div>
 
             {/* Current Salon Card */}
-            <Card className="mb-8 border-none shadow-sm">
+            <Card className="mb-6 md:mb-8 border-none shadow-sm">
               <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4 md:gap-0">
                   <div>
                     <CardTitle className="text-lg text-gray-900">CURRENT SALON</CardTitle>
                     <CardDescription className="text-gray-600">
@@ -180,7 +194,7 @@ export default function SalonDashboard() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="text-[#C8A84B] border-[#C8A84B] gap-2">
+                      <Button variant="outline" className="text-[#C8A84B] border-[#C8A84B] gap-2 w-full md:w-auto text-sm">
                         Switch Salon
                         <ChevronDown size={16} />
                       </Button>
@@ -207,7 +221,7 @@ export default function SalonDashboard() {
             </Card>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
               {stats.map((stat) => {
                 const Icon = stat.icon;
                 return (
@@ -234,7 +248,7 @@ export default function SalonDashboard() {
             </div>
 
             {/* Recent Ads and Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
               {/* Your Recent Ads */}
               <div className="lg:col-span-2">
                 <Card className="border-none shadow-sm">
@@ -249,11 +263,11 @@ export default function SalonDashboard() {
                       {recentAds.map((ad) => (
                         <div
                           key={ad.id}
-                          className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors"
+                          className="flex flex-col md:flex-row md:items-center md:justify-between p-3 md:p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors gap-3"
                         >
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-gray-900">
+                            <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+                              <h4 className="font-semibold text-gray-900 text-sm md:text-base">
                                 {ad.title}
                               </h4>
                               <Badge
@@ -265,32 +279,32 @@ export default function SalonDashboard() {
                                 {ad.status}
                               </Badge>
                             </div>
-                            <p className="text-sm text-gray-600">{ad.category}</p>
+                            <p className="text-xs md:text-sm text-gray-600">{ad.category}</p>
                             <p className="text-xs text-gray-500 mt-1">
                               {ad.postedAt}
                             </p>
                           </div>
-                          <div className="flex items-center gap-6 mr-4">
+                          <div className="flex items-center justify-between md:gap-6 gap-3 md:mr-4">
                             <div className="text-center">
-                              <p className="text-sm font-semibold text-gray-900">
+                              <p className="text-sm md:text-base font-semibold text-gray-900">
                                 {ad.views}
                               </p>
                               <p className="text-xs text-gray-500">views</p>
                             </div>
                             <div className="text-center">
-                              <p className="text-sm font-semibold text-gray-900">
+                              <p className="text-sm md:text-base font-semibold text-gray-900">
                                 {ad.likes}
                               </p>
                               <p className="text-xs text-gray-500">likes</p>
                             </div>
                             <div className="text-center">
-                              <p className="text-sm font-semibold text-gray-900">
+                              <p className="text-sm md:text-base font-semibold text-gray-900">
                                 {ad.messages}
                               </p>
                               <p className="text-xs text-gray-500">messages</p>
                             </div>
                           </div>
-                          <button className="p-2 hover:bg-gray-200 rounded-full">
+                          <button className="p-2 hover:bg-gray-200 rounded-full md:ml-2">
                             <MoreVertical size={18} className="text-gray-600" />
                           </button>
                         </div>
@@ -304,8 +318,8 @@ export default function SalonDashboard() {
               </div>
 
               {/* Quick Actions */}
-              <div className="bg-orange-50 rounded-lg p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">
+              <div className="bg-orange-50 rounded-lg p-4 md:p-6">
+                <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4">
                   Quick Actions
                 </h3>
                 <div className="space-y-3">
