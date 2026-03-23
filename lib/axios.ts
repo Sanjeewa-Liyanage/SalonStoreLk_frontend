@@ -14,7 +14,12 @@ async function refreshTokens() {
     throw new Error("No refresh token available");
   }
 
-  const response = await axios.post(
+  // Create a temporary axios instance with baseURL for the refresh call
+  const refreshClient = axios.create({
+    baseURL: typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_BACKEND_URL,
+  });
+
+  const response = await refreshClient.post(
     "/api/auth/refresh",
     {},
     {

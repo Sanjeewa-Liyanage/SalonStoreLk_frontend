@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 //@ts-ignore
  import "./globals.css";
 import { MuiThemeProvider } from "@/context/MuiThemeContext";
+import { AuthProvider } from "@/context/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <MuiThemeProvider>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </MuiThemeProvider>
       </body>
     </html>
