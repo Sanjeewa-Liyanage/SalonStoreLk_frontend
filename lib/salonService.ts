@@ -50,6 +50,7 @@ export const fetchPendingSalons = (token: string) => salonRequest({ type: "pendi
 export const fetchSalonById    = (id: string, token: string) => salonRequest({ type: "by-id", id }, token);
 export const fetchByOwner      = (token: string) => salonRequest({ type: "by-owner" }, token);
 
+
 // Fetch full salon details by ID from the dedicated endpoint
 export const fetchSalonDetails = async (id: string, accessToken: string) => {
   try {

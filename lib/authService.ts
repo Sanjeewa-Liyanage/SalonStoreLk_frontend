@@ -1,4 +1,5 @@
 import axios from "axios";
+import apiClient from "./axios";
 
 export async function loginUser(email: string, password: string) {
   const client = axios.create({
@@ -16,13 +17,8 @@ export function RegisterUser(payload: any){
 }
 
 
-export async function getUserProfile(accessToken: string) {
-  const client = axios.create({
-    baseURL: typeof window !== "undefined" ? window.location.origin : "",
-  });
-  const { data } = await client.get("/api/user/me", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+export async function getUserProfile() {
+  const { data } = await apiClient.get("/user/me");
   console.log("User profile data:", data); // Debug log
   return data;
 }
@@ -57,4 +53,9 @@ export async function refreshAccessToken() {
     sessionStorage.setItem("refreshToken", data.refreshToken);
 
     return data.accessToken as string;
+}
+
+export async function logoutUser() {
+  sessionStorage.removeItem("accessToken");
+  sessionStorage.removeItem("refreshToken");
 }

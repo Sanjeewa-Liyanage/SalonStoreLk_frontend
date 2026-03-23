@@ -21,11 +21,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AuthGuard from "@/components/AuthGuard";
+import { useAuth } from "@/context/AuthContext";
 
 export default function SalonDashboard() {
   const [salons, setSalons] = useState<any[]>([]);
   const [currentSalon, setCurrentSalon] = useState<string>("Elegant Hair Studio");
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   // Fetch salons on component mount
   useEffect(() => {
@@ -199,7 +201,7 @@ export default function SalonDashboard() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
               <div>
                 <h1 className="text-2xl md:text-4xl font-playfair font-bold text-gray-900">
-                  Welcome back, Amal
+                  Welcome back, {user?.firstName || user?.name || 'User'}
                 </h1>
                 <p className="text-gray-500 mt-1 text-sm md:text-base">
                   Manage your salons and ads in one place

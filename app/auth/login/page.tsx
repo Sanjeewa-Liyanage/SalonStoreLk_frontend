@@ -28,7 +28,7 @@ export default function LoginPage() {
       sessionStorage.setItem("refreshToken", data.backendTokens.refreshToken);
 
       // Fetch full user profile using the access token
-      const userProfile = await getUserProfile(data.backendTokens.accessToken);
+      const userProfile = await getUserProfile();
       sessionStorage.setItem("user", JSON.stringify(userProfile));
       console.log("User profile after login:", userProfile);
       if(userProfile.role === "ADMIN" && userProfile.adminLevel==="SUPER") {
