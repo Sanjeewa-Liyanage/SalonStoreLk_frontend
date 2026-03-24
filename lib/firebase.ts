@@ -44,6 +44,7 @@ export const uploadSalonImage = async (file: File, salonCode: string): Promise<{
 
 export const uploadTransactionImage = async (file: File, userId:string, salonCode:string, referenceId:string ): Promise<{ url: string; path: string }> => {
   try{
+    //todo need to change the folder path making 
     // Validate file type - only PDFs and images allowed
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png',  'image/webp'];
     if (!allowedTypes.includes(file.type)) {
