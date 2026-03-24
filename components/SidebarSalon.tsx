@@ -16,8 +16,8 @@ import {
 
 const menuItems = [
   { name: "Overview", icon: LayoutDashboard, href: "/salon_owner/dashboard" },
-  { name: "My Ads", icon: CalendarDays, href: "/salon_owner/dashboard/appointments" },
-  { name: "My Salon", icon: Store, href: "/salon_owner/dashboard/my-salon" },
+  { name: "My Ads", icon: CalendarDays, href: "/salon_owner/myads" },
+  { name: "My Salon", icon: Store, href: "/salon_owner/mysalons" },
   { name: "Services", icon: Scissors, href: "/salon_owner/dashboard/services" },
   { name: "Staff", icon: Users, href: "/salon_owner/dashboard/staff" },
   { name: "Reviews", icon: MessageSquare, href: "/salon_owner/dashboard/reviews" },

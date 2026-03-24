@@ -23,10 +23,11 @@ import {
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/context/AuthContext";
 import AddSalonDialog from "@/components/AddSalonDialog";
+import { getStoredSalonId, setStoredSalonId } from "@/lib/salonSelection";
 
 export default function SalonDashboard() {
   const [salons, setSalons] = useState<any[]>([]);
-  const [currentSalon, setCurrentSalon] = useState<string>("Elegant Hair Studio");
+  const [currentSalonId, setCurrentSalonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { user } = useAuth();
@@ -39,9 +40,12 @@ export default function SalonDashboard() {
         const data = await fetchByOwner(accessToken);
         console.log("Fetched salons data:", data);
         setSalons(data || []);
-        // Set the first salon as current if available
+
         if (data && data.length > 0) {
-          setCurrentSalon(data[0].salonName);
+          const storedSalonId = getStoredSalonId();
+          const selectedSalon = data.find((salon: any) => salon.id === storedSalonId) || data[0];
+          setCurrentSalonId(selectedSalon.id);
+          setStoredSalonId(selectedSalon.id);
         }
       }
     } catch (error) {
@@ -162,6 +166,16 @@ export default function SalonDashboard() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const currentSalon =
+    salons.find((salon) => salon.id === currentSalonId)?.salonName ||
+    salons.find((salon) => salon.id === currentSalonId)?.name ||
+    "No salon selected";
+
+  const handleSalonChange = (salonId: string) => {
+    setCurrentSalonId(salonId);
+    setStoredSalonId(salonId);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Active":
@@ -242,7 +256,7 @@ export default function SalonDashboard() {
                           <DropdownMenuItem
                             key={salon.id}
                             className="cursor-pointer text-gray-900"
-                            onClick={() => setCurrentSalon(salon.salonName)}
+                            onClick={() => handleSalonChange(salon.id)}
                           >
                             {salon.salonName}
                           </DropdownMenuItem>
