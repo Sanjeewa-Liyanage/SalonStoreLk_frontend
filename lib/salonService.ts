@@ -71,7 +71,7 @@ export const fetchSalonDetails = async (id: string, accessToken: string) => {
 
 
 export async function createSalon(salonData: any) {
-  const token = localStorage.getItem("accessToken");
+  const token = sessionStorage.getItem("accessToken");
   
   try {
     const { data } = await axios.post("/api/salons/create", salonData, {
@@ -89,6 +89,7 @@ export async function createSalon(salonData: any) {
     return data;
   }
 }
+
 
 // export async function fetchByOwner(accessToken: string){
 //   const client = axios.create(
