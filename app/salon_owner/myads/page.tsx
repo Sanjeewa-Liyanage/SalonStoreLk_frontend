@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronDown, Clock3, ImageOff, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import HeaderSalon from "@/components/HeaderSalon";
 import SidebarSalon from "@/components/SidebarSalon";
@@ -61,6 +62,7 @@ function getStatusClass(status?: string): string {
 }
 
 export default function MyAdsPage() {
+	const router = useRouter();
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [salons, setSalons] = useState<any[]>([]);
 	const [selectedSalonId, setSelectedSalonId] = useState<string | null>(null);
@@ -165,7 +167,7 @@ export default function MyAdsPage() {
 								</div>
 								<Button
 									className="bg-[#C8A84B] hover:bg-[#B39740] text-black font-semibold text-sm md:text-base w-full md:w-auto"
-									onClick={() => window.alert("Create Ad flow will be connected next.")}
+									onClick={() => router.push("/salon_owner/myads/create")}
 								>
 									<Plus size={16} className="mr-2" />
 									Create Ad
