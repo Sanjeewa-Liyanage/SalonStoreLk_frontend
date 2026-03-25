@@ -27,6 +27,7 @@ import {
   Menu as MenuIcon,
   Close as CloseIcon,
   Logout as LogoutIcon,
+  AdsClick as AdsClickIcon,
 } from '@mui/icons-material';
 import { useMuiTheme } from '@/context/MuiThemeContext';
 import Link from 'next/link';
@@ -60,9 +61,15 @@ const MENU_ITEMS = [
     ],
   },
   {
-    label: 'Analytics',
-    icon: AnalyticsIcon,
-    href: '/admin/analytics',
+    label: 'Ads',
+    icon: AdsClickIcon,
+    href: '/admin/ads',
+    children:[
+      {label: 'All Ads', href: '/admin/ads'},
+      {label: 'Active Ads', href: '/admin/ads?status=active'},
+      {label: 'Pending Ads', href: '/admin/ads?status=pending'},
+      {label: 'Rejected Ads', href: '/admin/ads?status=rejected'},
+    ]
   },
   {
     label: 'Settings',
@@ -140,7 +147,7 @@ export default function Sidebar() {
       </Box>
 
       {/* Navigation */}
-      <List sx={{ flex: 1, px: 1.5, py: 2, overflow: 'auto' }}>
+      <List sx={{ flex: 1, px: 1.5, py: 2, overflow: 'auto', scrollbarWidth:'none', '&::-webkit-scrollbar': { display: 'none' } }}>
         {MENU_ITEMS.map((item) => (
           <React.Fragment key={item.label}>
             <ListItemButton

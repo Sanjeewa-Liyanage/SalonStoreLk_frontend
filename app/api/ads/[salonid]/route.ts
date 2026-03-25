@@ -7,12 +7,15 @@ export async function GET(
 ) {
     try{
         const { salonid } = await params;
-        const authHeader = req.headers.get("authorization");
-        const headers = authHeader ? { Authorization: authHeader } : undefined;
+        const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+        if (!authHeader) {
+            return NextResponse.json({ message: "Authorization header is required" }, { status: 401 });
+        }
+        const headers = { Authorization: authHeader };
         if (!salonid) {
             return NextResponse.json({ message: "Salon ID is required" }, { status: 400 });
         }
-        const {data} = await apiClient.get(`ads/${salonid}`, { headers });
+        const {data} = await apiClient.get(`/ads/${salonid}`, { headers });
         return NextResponse.json(data, { status: 200 });
     }catch(error:any){
         const status = error?.response?.status || 500;
