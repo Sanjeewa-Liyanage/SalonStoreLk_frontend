@@ -52,3 +52,12 @@ export interface ExtraBenefit {
   label: string;
   amount: string;
 }
+
+export enum AdStatus {
+  DRAFT = 'DRAFT',
+  PENDING_APPROVAL = 'PENDING_APPROVAL',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  EXPIRED = 'EXPIRED',
+  ACTIVE = 'ACTIVE',
+}
