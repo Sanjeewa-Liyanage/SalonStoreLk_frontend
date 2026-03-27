@@ -84,7 +84,7 @@ interface AdTableProps {
 	processingId?: string | null;
 	onApprove?: (id: string) => void;
 	onReject?: (id: string) => void;
-	onView?: (id: string) => void;
+	onRowClick?: (id: string) => void;
 }
 
 const AdTable = ({
@@ -95,7 +95,7 @@ const AdTable = ({
 	processingId,
 	onApprove,
 	onReject,
-	onView,
+	onRowClick,
 }: AdTableProps) => {
 	const headers = showActions
 		? ['Title', 'Salon Name', 'Status', 'Created', 'Actions']
@@ -147,7 +147,9 @@ const AdTable = ({
 						<Box
 							component="tr"
 							key={ad.id}
+							onClick={() => onRowClick?.(ad.id)}
 							sx={{
+								cursor: onRowClick ? 'pointer' : 'default',
 								'&:hover': {
 									backgroundColor: isDark
 										? 'rgba(167, 139, 250, 0.08)'
@@ -173,19 +175,10 @@ const AdTable = ({
 								{formatDate(ad.createdAt)}
 							</Box>
 
-							{/* Actions column — shown in pending and rejected tabs */}
+							{/* Actions column — shown in pending tabs */}
 							{showActions && (
 								<Box component="td" sx={cellSx()}>
 									<Stack direction="row" spacing={1}>
-										<Button
-											size="small"
-											variant="outlined"
-											color="info"
-											onClick={() => onView?.(ad.id)}
-											sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-										>
-											View Details
-										</Button>
 										{currentTab === 'pending' && (
 											<>
 												<Button
@@ -558,11 +551,11 @@ export default function AdminAdsPage() {
 													ads={paginatedList}
 													isDark={isDark}
 													currentTab={activeTab}
-													showActions={activeTab === 'pending' || activeTab === 'rejected'}
+													showActions={activeTab === 'pending'}
 													processingId={processingId}
 													onApprove={handleApprove}
 													onReject={requestReject}
-													onView={(id) => setViewAdId(id)}
+													onRowClick={(id) => setViewAdId(id)}
 												/>
 											)}
 
