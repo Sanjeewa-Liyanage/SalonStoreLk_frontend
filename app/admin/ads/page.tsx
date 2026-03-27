@@ -29,7 +29,7 @@ import {
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { getAllAds } from '@/lib/adsService';
+import { getAllAds, approveAd, rejectAd } from '@/lib/adsService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import AdDetailsDialog from '@/components/AdDetailsDialog';
@@ -185,7 +185,7 @@ const AdTable = ({
 													size="small"
 													variant="contained"
 													color="success"
-													onClick={() => onApprove?.(ad.id)}
+													onClick={(e) => { e.stopPropagation(); onApprove?.(ad.id); }}
 													disabled={processingId === ad.id}
 													sx={{ textTransform: 'none', fontSize: '0.75rem' }}
 												>
@@ -195,7 +195,7 @@ const AdTable = ({
 													size="small"
 													variant="outlined"
 													color="error"
-													onClick={() => onReject?.(ad.id)}
+													onClick={(e) => { e.stopPropagation(); onReject?.(ad.id); }}
 													disabled={processingId === ad.id}
 													sx={{ textTransform: 'none', fontSize: '0.75rem' }}
 												>
@@ -233,6 +233,7 @@ export default function AdminAdsPage() {
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [rejectConfirmState, setRejectConfirmState] = useState<string | null>(null);
+	const [rejectReason, setRejectReason] = useState('');
 	const [viewAdId, setViewAdId] = useState<string | null>(null);
 
 	const rowsPerPage = 10;
@@ -339,8 +340,7 @@ export default function AdminAdsPage() {
 			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
-			// TODO: Call approve ad service when available
-			// await approveAd(adId, token);
+			await approveAd(adId);
 
 			// Optimistically update local state
 			setAllAds((prev) =>
@@ -361,8 +361,7 @@ export default function AdminAdsPage() {
 			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
-			// TODO: Call reject ad service when available
-			// await rejectAd(adId, token);
+			await rejectAd(adId, rejectReason.trim() || 'Rejected by admin');
 
 			setAllAds((prev) =>
 				prev.map((ad) => (ad.id === adId ? { ...ad, status: 'REJECTED' } : ad))
@@ -376,6 +375,7 @@ export default function AdminAdsPage() {
 
 	const requestReject = (adId: string) => {
 		setRejectConfirmState(adId);
+		setRejectReason('');
 	};
 
 	const cancelRejectConfirm = () => {
@@ -590,9 +590,23 @@ export default function AdminAdsPage() {
 				open={Boolean(rejectConfirmState)}
 				title="Reject Ad"
 				message={
-					rejectTargetAd
-						? `Are you sure you want to reject "${rejectTargetAd.title}"? This ad will be moved to the rejected list.`
-						: 'Are you sure you want to reject this ad?'
+					<>
+						{rejectTargetAd
+							? `Are you sure you want to reject "${rejectTargetAd.title}"? This ad will be moved to the rejected list.`
+							: 'Are you sure you want to reject this ad?'}
+						<TextField
+							size="small"
+							label="Rejection Reason"
+							placeholder="e.g. Inappropriate content"
+							value={rejectReason}
+							onChange={(e) => setRejectReason(e.target.value)}
+							multiline
+							minRows={2}
+							maxRows={4}
+							fullWidth
+							sx={{ mt: 2 }}
+						/>
+					</>
 				}
 				variant="danger"
 				confirmLabel="Yes, Reject"

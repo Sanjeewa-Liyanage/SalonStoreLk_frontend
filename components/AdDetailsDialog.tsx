@@ -121,7 +121,7 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      
+
       <DialogContent dividers>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -150,29 +150,29 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                 <Box>
                   <Typography variant="caption" color="text.secondary">Ad Status</Typography>
                   <Box mt={0.5}>
-                    <Chip 
-                      size="small" 
-                      label={(data.ad?.status || 'Unknown').replace('_', ' ')} 
-                      color={statusColor(data.ad?.status)} 
+                    <Chip
+                      size="small"
+                      label={(data.ad?.status || 'Unknown').replace('_', ' ')}
+                      color={statusColor(data.ad?.status)}
                       sx={{ textTransform: 'capitalize' }}
                     />
                   </Box>
                 </Box>
-                
+
                 {data.ad?.imageUrl && data.ad.imageUrl.length > 0 && (
                   <Box mt={1}>
                     <Typography variant="caption" color="text.secondary" gutterBottom>Ad Images</Typography>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
                       {data.ad.imageUrl.map((img: string, i: number) => (
-                        <Box 
-                          key={i} 
-                          component="img" 
-                          src={img} 
+                        <Box
+                          key={i}
+                          component="img"
+                          src={img}
                           alt={`Ad Image ${i + 1}`}
-                          sx={{ 
-                            width: 80, 
-                            height: 80, 
-                            objectFit: 'cover', 
+                          sx={{
+                            width: 80,
+                            height: 80,
+                            objectFit: 'cover',
                             borderRadius: 1,
                             cursor: 'pointer',
                             border: '1px solid #eee'
@@ -192,7 +192,7 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
               {data.payments && data.payments.length > 0 ? (
                 data.payments.map((payment: any, idx: number) => (
                   <Box key={payment.id || idx} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #eaecf5' }}>
-                    
+
                     <Box>
                       <Typography variant="caption" color="text.secondary">Transaction ID</Typography>
                       <Typography variant="body2">{payment.transactionId || '-'}</Typography>
@@ -204,10 +204,10 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                     <Box>
                       <Typography variant="caption" color="text.secondary">Payment Status</Typography>
                       <Box mt={0.5}>
-                        <Chip 
-                          size="small" 
-                          label={(payment.status || 'Unknown').replace('_', ' ')} 
-                          color={statusColor(payment.status)} 
+                        <Chip
+                          size="small"
+                          label={(payment.status || 'Unknown').replace('_', ' ')}
+                          color={statusColor(payment.status)}
                           sx={{ textTransform: 'capitalize' }}
                         />
                       </Box>
@@ -224,8 +224,8 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                         <Typography variant="caption" color="text.secondary" gutterBottom>Payment Proof</Typography>
                         <Box mt={0.5}>
                           {isPdf(payment.paymentProofUrl) ? (
-                            <Button 
-                              variant="outlined" 
+                            <Button
+                              variant="outlined"
                               startIcon={<PictureAsPdfIcon color="error" />}
                               endIcon={<OpenInNewIcon />}
                               onClick={() => window.open(payment.paymentProofUrl, '_blank')}
@@ -235,14 +235,14 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                               View PDF Document
                             </Button>
                           ) : (
-                            <Box 
-                              component="img" 
-                              src={payment.paymentProofUrl} 
+                            <Box
+                              component="img"
+                              src={payment.paymentProofUrl}
                               alt="Payment Proof"
-                              sx={{ 
-                                maxWidth: '100%', 
-                                maxHeight: 200, 
-                                objectFit: 'contain', 
+                              sx={{
+                                maxWidth: '100%',
+                                maxHeight: 200,
+                                objectFit: 'contain',
                                 borderRadius: 1,
                                 cursor: 'pointer',
                                 border: '1px solid #eee',
