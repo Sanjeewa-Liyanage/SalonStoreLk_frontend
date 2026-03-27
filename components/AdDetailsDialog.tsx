@@ -14,11 +14,15 @@ import {
   Divider,
   IconButton,
   Link as MuiLink,
+  TextField,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { getAdsAndPayment } from '@/lib/adsService';
+import { verifyPayment, rejectPayment } from '@/lib/paymentService';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 
 interface AdDetailsDialogProps {
   open: boolean;
@@ -30,6 +34,10 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     if (open && adId) {
@@ -53,6 +61,40 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
       setError(err?.response?.data?.message || err.message || 'Failed to load details.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerify = async (paymentId: string) => {
+    setVerifying(paymentId);
+    try {
+      await verifyPayment(paymentId);
+      if (adId) await fetchDetails(adId);
+    } catch (err: any) {
+      console.error('Failed to verify payment:', err);
+      setError(err?.response?.data?.message || err.message || 'Failed to verify payment.');
+    } finally {
+      setVerifying(null);
+    }
+  };
+
+  const handleRejectClick = (paymentId: string) => {
+    setRejectingId(paymentId);
+    setRejectReason('');
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectingId || !rejectReason.trim()) return;
+    setRejecting(rejectingId);
+    try {
+      await rejectPayment(rejectingId, rejectReason.trim());
+      setRejectingId(null);
+      setRejectReason('');
+      if (adId) await fetchDetails(adId);
+    } catch (err: any) {
+      console.error('Failed to reject payment:', err);
+      setError(err?.response?.data?.message || err.message || 'Failed to reject payment.');
+    } finally {
+      setRejecting(null);
     }
   };
 
@@ -210,6 +252,66 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                             />
                           )}
                         </Box>
+                      </Box>
+                    )}
+
+                    {payment.status !== 'VERIFIED' && payment.status !== 'REJECTED' && (
+                      <Box mt={1.5} sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
+                          startIcon={verifying === payment.id ? <CircularProgress size={16} color="inherit" /> : <CheckCircleOutlineIcon />}
+                          disabled={verifying === payment.id || rejecting === payment.id}
+                          onClick={() => handleVerify(payment.id)}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          {verifying === payment.id ? 'Verifying...' : 'Verify Payment'}
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          startIcon={rejecting === payment.id ? <CircularProgress size={16} color="inherit" /> : <CancelOutlinedIcon />}
+                          disabled={verifying === payment.id || rejecting === payment.id}
+                          onClick={() => handleRejectClick(payment.id)}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          {rejecting === payment.id ? 'Rejecting...' : 'Reject Payment'}
+                        </Button>
+                      </Box>
+                    )}
+
+                    {rejectingId === payment.id && (
+                      <Box mt={1.5} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <TextField
+                          size="small"
+                          label="Rejection Reason"
+                          placeholder="e.g. fraud detected"
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          multiline
+                          minRows={1}
+                          maxRows={3}
+                          sx={{ flex: 1 }}
+                        />
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          disabled={!rejectReason.trim() || rejecting === payment.id}
+                          onClick={handleRejectConfirm}
+                          sx={{ textTransform: 'none', mt: 0.5 }}
+                        >
+                          Confirm
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() => setRejectingId(null)}
+                          sx={{ textTransform: 'none', mt: 0.5 }}
+                        >
+                          Cancel
+                        </Button>
                       </Box>
                     )}
                   </Box>
