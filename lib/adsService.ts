@@ -19,19 +19,19 @@ function normalizeStatus(status: string): AdStatus {
 
 
 
-export async function createAd(adData: any){
+export async function createAd(adData: any) {
     const token = sessionStorage.getItem("accessToken");
-    try{
-        const {data} = await axios.post("/api/ads/create", adData, {
+    try {
+        const { data } = await axios.post("/api/ads/create", adData, {
             headers: { Authorization: `Bearer ${token}` },
 
 
         })
         return data;
-    }catch(error:any){
+    } catch (error: any) {
         if (error?.response?.status !== 401) throw error;
         const nextAccessToken = await refreshAccessToken();
-        const {data} = await axios.post("/api/ads/create", adData, {
+        const { data } = await axios.post("/api/ads/create", adData, {
             headers: { Authorization: `Bearer ${nextAccessToken}` },
         })
         return data;
@@ -39,16 +39,16 @@ export async function createAd(adData: any){
 
 }
 export async function adsBySalon(salonId: string, accessToken: string) {
-    try{
-        const {data} = await axios.get(`/api/ads/${salonId}`, {
+    try {
+        const { data } = await axios.get(`/api/ads/${salonId}`, {
             headers: { Authorization: `Bearer ${accessToken}` },
         });
         return data;
 
-    }catch(error:any){
+    } catch (error: any) {
         if (error?.response?.status !== 401) throw error;
         const nextAccessToken = await refreshAccessToken();
-        const {data} = await axios.get(`/api/ads/${salonId}`, {
+        const { data } = await axios.get(`/api/ads/${salonId}`, {
             headers: { Authorization: `Bearer ${nextAccessToken}` },
         });
         return data;
@@ -58,14 +58,14 @@ export async function adsBySalon(salonId: string, accessToken: string) {
 export async function getAllAds(accessToken?: string) {
     const token = resolveAccessToken(accessToken);
     if (!token) throw new Error("No access token found.");
-    try{
+    try {
         const headers = { Authorization: `Bearer ${token}` };
-        const {data} = await axios.get(`/api/ads/all`, { headers });
+        const { data } = await axios.get(`/api/ads/all`, { headers });
         return data;
-    }catch(error:any){
+    } catch (error: any) {
         if (error?.response?.status !== 401) throw error;
         const nextAccessToken = await refreshAccessToken();
-        const {data} = await axios.get(`/api/ads/all`, {
+        const { data } = await axios.get(`/api/ads/all`, {
             headers: { Authorization: `Bearer ${nextAccessToken}` },
         });
         return data;
@@ -73,15 +73,15 @@ export async function getAllAds(accessToken?: string) {
 }
 
 export async function getAdsAndPayment(adId: string, accessToken: string) {
-    try{
-        const {data} = await axios.get(`/api/ads/${adId}/payment`, {
+    try {
+        const { data } = await axios.get(`/api/ads/${adId}/payment`, {
             headers: { Authorization: `Bearer ${accessToken}` },
         });
         return data;
-    }catch(error:any){
+    } catch (error: any) {
         if (error?.response?.status !== 401) throw error;
         const nextAccessToken = await refreshAccessToken();
-        const {data} = await axios.get(`/api/ads/${adId}/payment`, {
+        const { data } = await axios.get(`/api/ads/${adId}/payment`, {
             headers: { Authorization: `Bearer ${nextAccessToken}` },
         });
         return data;
@@ -92,16 +92,50 @@ export async function getAdsByStatus(status: string, accessToken?: string) {
     const token = resolveAccessToken(accessToken);
     if (!token) throw new Error("No access token found.");
     const normalizedStatus = normalizeStatus(status);
-    try{
+    try {
         const headers = { Authorization: `Bearer ${token}` };
-        const {data} = await axios.get(`/api/ads/status/${normalizedStatus}`, {
+        const { data } = await axios.get(`/api/ads/status/${normalizedStatus}`, {
             headers,
         });
         return data;
-    }catch(error:any){
+    } catch (error: any) {
         if (error?.response?.status !== 401) throw error;
         const nextAccessToken = await refreshAccessToken();
-        const {data} = await axios.get(`/api/ads/status/${normalizedStatus}`, {
+        const { data } = await axios.get(`/api/ads/status/${normalizedStatus}`, {
+            headers: { Authorization: `Bearer ${nextAccessToken}` },
+        });
+        return data;
+    }
+}
+export async function approveAd(adId: string) {
+    const token = sessionStorage.getItem("accessToken")
+    try {
+        const { data } = await axios.patch(`/api/ads/approve/${adId}`, {}, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return data;
+    } catch (error: any) {
+        if (error?.response?.status !== 401) throw error;
+
+        const nextAccessToken = await refreshAccessToken();
+        const { data } = await axios.patch(`/api/ads/approve/${adId}`, {}, {
+            headers: { Authorization: `Bearer ${nextAccessToken}` },
+        });
+        return data;
+    }
+}
+export async function rejectAd(adId: string, reason: string) {
+    const token = sessionStorage.getItem("accessToken")
+    try {
+        const { data } = await axios.patch(`/api/ads/reject/${adId}`, { reason }, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return data;
+    } catch (error: any) {
+        if (error?.response?.status !== 401) throw error;
+
+        const nextAccessToken = await refreshAccessToken();
+        const { data } = await axios.patch(`/api/ads/reject/${adId}`, { reason }, {
             headers: { Authorization: `Bearer ${nextAccessToken}` },
         });
         return data;
