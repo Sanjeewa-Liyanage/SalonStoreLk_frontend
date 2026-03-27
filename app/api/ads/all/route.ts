@@ -15,14 +15,20 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        const { searchParams } = new URL(req.url);
+        const page = searchParams.get("page") || "1";
+        const limit = searchParams.get("limit") || "10";
+
         const { data } = await apiClient.get("/ads/admin/all", {
             headers: { Authorization: authHeader },
+            params: { page, limit },
         });
 
         return NextResponse.json(data, { status: 200 });
     } catch (error: any) {
         const status = error?.response?.status || 500;
-        const message = error?.response?.data?.message || "Failed to fetch all ads";
+        const message =
+            error?.response?.data?.message || "Failed to fetch all ads";
         return NextResponse.json({ message }, { status });
     }
 }

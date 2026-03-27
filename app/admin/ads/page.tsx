@@ -32,6 +32,7 @@ import { useMuiTheme } from '@/context/MuiThemeContext';
 import { getAllAds } from '@/lib/adsService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import AdDetailsDialog from '@/components/AdDetailsDialog';
 
 interface Ad {
 	id: string;
@@ -83,6 +84,7 @@ interface AdTableProps {
 	processingId?: string | null;
 	onApprove?: (id: string) => void;
 	onReject?: (id: string) => void;
+	onView?: (id: string) => void;
 }
 
 const AdTable = ({
@@ -93,6 +95,7 @@ const AdTable = ({
 	processingId,
 	onApprove,
 	onReject,
+	onView,
 }: AdTableProps) => {
 	const headers = showActions
 		? ['Title', 'Salon Name', 'Status', 'Created', 'Actions']
@@ -173,34 +176,41 @@ const AdTable = ({
 							{/* Actions column — shown in pending and rejected tabs */}
 							{showActions && (
 								<Box component="td" sx={cellSx()}>
-									{currentTab === 'pending' ? (
-										<Stack direction="row" spacing={1}>
-											<Button
-												size="small"
-												variant="contained"
-												color="success"
-												onClick={() => onApprove?.(ad.id)}
-												disabled={processingId === ad.id}
-												sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-											>
-												{processingId === ad.id ? 'Approving...' : 'Approve'}
-											</Button>
-											<Button
-												size="small"
-												variant="outlined"
-												color="error"
-												onClick={() => onReject?.(ad.id)}
-												disabled={processingId === ad.id}
-												sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-											>
-												{processingId === ad.id ? 'Rejecting...' : 'Reject'}
-											</Button>
-										</Stack>
-									) : (
-										<Typography variant="body2" sx={{ color: isDark ? '#6b7a99' : '#94a3b8', fontSize: '0.75rem' }}>
-											No actions
-										</Typography>
-									)}
+									<Stack direction="row" spacing={1}>
+										<Button
+											size="small"
+											variant="outlined"
+											color="info"
+											onClick={() => onView?.(ad.id)}
+											sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+										>
+											View Details
+										</Button>
+										{currentTab === 'pending' && (
+											<>
+												<Button
+													size="small"
+													variant="contained"
+													color="success"
+													onClick={() => onApprove?.(ad.id)}
+													disabled={processingId === ad.id}
+													sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+												>
+													{processingId === ad.id ? 'Approving...' : 'Approve'}
+												</Button>
+												<Button
+													size="small"
+													variant="outlined"
+													color="error"
+													onClick={() => onReject?.(ad.id)}
+													disabled={processingId === ad.id}
+													sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+												>
+													{processingId === ad.id ? 'Rejecting...' : 'Reject'}
+												</Button>
+											</>
+										)}
+									</Stack>
 								</Box>
 							)}
 						</Box>
@@ -230,6 +240,7 @@ export default function AdminAdsPage() {
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [rejectConfirmState, setRejectConfirmState] = useState<string | null>(null);
+	const [viewAdId, setViewAdId] = useState<string | null>(null);
 
 	const rowsPerPage = 10;
 	const activeTab = normalizeAdTab(searchParams.get('status'));
@@ -547,10 +558,11 @@ export default function AdminAdsPage() {
 													ads={paginatedList}
 													isDark={isDark}
 													currentTab={activeTab}
-													showActions={activeTab === 'pending'}
+													showActions={activeTab === 'pending' || activeTab === 'rejected'}
 													processingId={processingId}
 													onApprove={handleApprove}
 													onReject={requestReject}
+													onView={(id) => setViewAdId(id)}
 												/>
 											)}
 
@@ -574,6 +586,12 @@ export default function AdminAdsPage() {
 					</Box>
 				</Box>
 			</Box>
+
+			<AdDetailsDialog 
+				open={Boolean(viewAdId)} 
+				onClose={() => setViewAdId(null)} 
+				adId={viewAdId} 
+			/>
 
 			<ConfirmDialog
 				open={Boolean(rejectConfirmState)}

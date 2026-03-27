@@ -31,20 +31,31 @@ export async function GET(
         if (!isValidStatus(normalizedStatus)) {
             return NextResponse.json(
                 {
-                    message: `Invalid status. Must be one of: ${VALID_AD_STATUSES.join(", ")}`,
+                    message: `Invalid status. Must be one of: ${VALID_AD_STATUSES.join(
+                        ", "
+                    )}`,
                 },
                 { status: 400 }
             );
         }
 
-        const { data } = await apiClient.get(`/ads/status/${normalizedStatus}`, {
-            headers: { Authorization: authHeader },
-        });
+        const { searchParams } = new URL(req.url);
+        const page = searchParams.get("page") || "1";
+        const limit = searchParams.get("limit") || "10";
+
+        const { data } = await apiClient.get(
+            `/ads/status/${normalizedStatus}`,
+            {
+                headers: { Authorization: authHeader },
+                params: { page, limit },
+            }
+        );
 
         return NextResponse.json(data, { status: 200 });
     } catch (error: any) {
         const status = error?.response?.status || 500;
-        const message = error?.response?.data?.message || "Failed to fetch ads by status";
+        const message =
+            error?.response?.data?.message || "Failed to fetch ads by status";
         return NextResponse.json({ message }, { status });
     }
 }
