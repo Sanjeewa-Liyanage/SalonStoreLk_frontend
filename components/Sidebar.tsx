@@ -72,6 +72,12 @@ const MENU_ITEMS = [
     ]
   },
   {
+    label: 'Ads planS',
+    icon: AnalyticsIcon,
+    href: '/admin/adsplans',
+
+  },
+  {
     label: 'Settings',
     icon: SettingsIcon,
     href: '/admin/settings',
