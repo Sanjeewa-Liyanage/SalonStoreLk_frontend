@@ -1,204 +1,394 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { MOCK_SALONS } from '@/lib/mockData';
-import SalonCard from './SalonCard';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Loader2, MapPin } from 'lucide-react';
+import { getByPrority } from '@/lib/salonService';
+import { getByPriority as getAdsByPriority } from '@/lib/adsService';
+
+type TimestampDto = {
+  _seconds?: number;
+  _nanoseconds?: number;
+};
+
+type SalonDto = {
+  id: string;
+  salonName: string;
+  city?: string;
+  address?: string;
+  description?: string;
+  images?: string[];
+  services?: Array<{ name: string }>;
+  adCount?: number;
+};
+
+type AdDto = {
+  id: string;
+  title: string;
+  description?: string;
+  imageUrl?: string[];
+  salonName?: string;
+  createdAt?: TimestampDto;
+};
+
+type GenericPagination = {
+  page?: number;
+  currentPage?: number;
+  totalPages?: number;
+  totalItems?: number;
+};
+
+type PagedResponse<T> = {
+  data?: T[];
+  pagination?: GenericPagination;
+};
 
 interface FindSalonPageProps {
   onSalonSelect?: (salonId: string) => void;
 }
 
-export default function FindSalonPage({ onSalonSelect }: FindSalonPageProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('rating');
-  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+const SALONS_PER_PAGE = 10;
 
-  const itemsPerPage = 10;
+const PLACEHOLDER_IMG =
+  'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1200&q=70';
 
-  // Filter and sort salons
-  const filteredAndSortedSalons = useMemo(() => {
-    let salons = [...MOCK_SALONS];
+function safeImage(url?: string) {
+  if (!url || typeof url !== 'string') return PLACEHOLDER_IMG;
+  return url;
+}
 
-    // Filter by category
-    if (filterCategory) {
-      salons = salons.filter((s) => s.category === filterCategory);
-    }
+function formatPostDate(timestamp?: TimestampDto) {
+  if (!timestamp?._seconds) return 'Recently posted';
+  const date = new Date(timestamp._seconds * 1000);
+  if (Number.isNaN(date.getTime())) return 'Recently posted';
+  return date.toLocaleDateString();
+}
 
-    // Sort
-    switch (sortBy) {
-      case 'rating':
-        return salons.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      case 'name':
-        return salons.sort((a, b) => a.name.localeCompare(b.name));
-      case 'newest':
-        return salons.reverse();
-      default:
-        return salons;
-    }
-  }, [sortBy, filterCategory]);
-
-  // Pagination
-  const totalPages = Math.ceil(filteredAndSortedSalons.length / itemsPerPage);
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedSalons = filteredAndSortedSalons.slice(
-    startIdx,
-    startIdx + itemsPerPage
+function BlurredContainImage({
+  src,
+  alt,
+  heightClass,
+}: {
+  src: string;
+  alt: string;
+  heightClass: string;
+}) {
+  return (
+    <div className={`relative w-full overflow-hidden bg-gray-100 ${heightClass}`}>
+      <div
+        className="absolute inset-0 scale-110 bg-center bg-cover blur-2xl"
+        style={{ backgroundImage: `url(${src})` }}
+        aria-hidden="true"
+      />
+      <img
+        src={src}
+        alt={alt}
+        className="relative z-10 h-full w-full object-contain"
+        loading="lazy"
+      />
+    </div>
   );
+}
 
-  // Get unique categories for filter
-  const categories = Array.from(new Set(MOCK_SALONS.map((s) => s.category)));
+function AdImageLayout({ images, title }: { images: string[]; title: string }) {
+  const safeImages = images.length ? images : [PLACEHOLDER_IMG];
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  if (safeImages.length === 1) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-black/10 bg-white">
+        <BlurredContainImage src={safeImage(safeImages[0])} alt={title} heightClass="h-72" />
+      </div>
+    );
+  }
+
+  if (safeImages.length === 2) {
+    return (
+      <div className="grid grid-cols-2 gap-1.5">
+        {safeImages.slice(0, 2).map((image, idx) => (
+          <div key={`${image}-${idx}`} className="overflow-hidden rounded-xl border border-black/10 bg-white">
+            <BlurredContainImage src={safeImage(image)} alt={`${title} ${idx + 1}`} heightClass="h-64" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (safeImages.length === 3) {
+    return (
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="overflow-hidden rounded-xl border border-black/10 bg-white">
+          <BlurredContainImage src={safeImage(safeImages[0])} alt={`${title} 1`} heightClass="h-96" />
+        </div>
+        {safeImages.slice(1, 3).map((image, idx) => (
+          <div key={`${image}-${idx}`} className="overflow-hidden rounded-xl border border-black/10 bg-white">
+            <BlurredContainImage src={safeImage(image)} alt={`${title} ${idx + 2}`} heightClass="h-48" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const visible = safeImages.slice(0, 4);
+  const remaining = safeImages.length - 4;
 
   return (
-    <main className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="bg-[#d4a32b] py-8 md:py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-black mb-2">
-            Find Your Perfect Salon
-          </h1>
-          <p className="text-black/80">
-            Showing {startIdx + 1}-{Math.min(startIdx + itemsPerPage, filteredAndSortedSalons.length)} of{' '}
-            {filteredAndSortedSalons.length} results
-          </p>
-        </div>
-      </div>
-
-      {/* Filters and Sort */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {/* Category Filter */}
-          <div>
-            <label className="block text-sm font-semibold text-black mb-2">
-              Filter by Category
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setFilterCategory(null)}
-                className={`px-4 py-2 rounded font-medium transition ${
-                  filterCategory === null
-                    ? 'bg-black text-white'
-                    : 'bg-gray-200 text-black hover:bg-gray-300'
-                }`}
-              >
-                All
-              </button>
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setFilterCategory(category)}
-                  className={`px-4 py-2 rounded font-medium transition ${
-                    filterCategory === category
-                      ? 'bg-black text-white'
-                      : 'bg-gray-200 text-black hover:bg-gray-300'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
+    <div className="grid grid-cols-2 gap-1.5">
+      {visible.map((image, idx) => (
+        <div key={`${image}-${idx}`} className="relative overflow-hidden rounded-xl border border-black/10 bg-white">
+          <BlurredContainImage src={safeImage(image)} alt={`${title} ${idx + 1}`} heightClass="h-48" />
+          {idx === 3 && remaining > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-2xl font-bold text-white">
+              +{remaining}
             </div>
-          </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
-          {/* Sort */}
-          <div>
-            <label className="block text-sm font-semibold text-black mb-2">
-              Sort by
-            </label>
-            <select
-              value={sortBy}
-              onChange={(e) => {
-                setSortBy(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full md:w-48 px-4 py-2 border-2 border-black rounded font-medium bg-white cursor-pointer hover:bg-gray-50"
-            >
-              <option value="rating">Average Rating</option>
-              <option value="name">Name (A-Z)</option>
-              <option value="newest">Newest</option>
-            </select>
-          </div>
+export default function FindSalonPage({ onSalonSelect }: FindSalonPageProps) {
+  const [salons, setSalons] = useState<SalonDto[]>([]);
+  const [ads, setAds] = useState<AdDto[]>([]);
+  const [salonPage, setSalonPage] = useState(1);
+  const [salonTotalPages, setSalonTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadData() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const [salonRes, adsRes] = await Promise.all([
+          getByPrority(salonPage, SALONS_PER_PAGE),
+          getAdsByPriority(1, 10),
+        ]);
+
+        if (!isMounted) return;
+
+        const salonPayload = (salonRes.data ?? {}) as PagedResponse<SalonDto>;
+        const adPayload = (adsRes.data ?? {}) as PagedResponse<AdDto>;
+
+        setSalons(Array.isArray(salonPayload.data) ? salonPayload.data : []);
+        setAds(Array.isArray(adPayload.data) ? adPayload.data : []);
+        setSalonTotalPages(Math.max(1, salonPayload.pagination?.totalPages ?? 1));
+      } catch (err: any) {
+        if (!isMounted) return;
+        setError(err?.response?.data?.message || 'Failed to load salon and ad data.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [salonPage]);
+
+  const showingLabel = useMemo(() => {
+    const from = (salonPage - 1) * SALONS_PER_PAGE + 1;
+    const to = (salonPage - 1) * SALONS_PER_PAGE + salons.length;
+    return `Showing ${from}-${to} results`;
+  }, [salonPage, salons.length]);
+
+  const canGoPrev = salonPage > 1;
+  const canGoNext = salonPage < salonTotalPages;
+
+  const pageNumbers = useMemo(() => {
+    const pages: number[] = [];
+    const maxWindow = 5;
+    const start = Math.max(1, salonPage - 2);
+    const end = Math.min(salonTotalPages, start + maxWindow - 1);
+    for (let p = start; p <= end; p += 1) pages.push(p);
+    return pages;
+  }, [salonPage, salonTotalPages]);
+
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    const node = carouselRef.current;
+    if (!node) return;
+    const amount = Math.max(280, Math.floor(node.clientWidth * 0.8));
+    node.scrollBy({
+      left: direction === 'left' ? -amount : amount,
+      behavior: 'smooth',
+    });
+  };
+
+  useEffect(() => {
+    if (!carouselRef.current) return;
+    carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+  }, [salonPage]);
+
+  return (
+    <main className="min-h-screen bg-[#f3f3f3] pb-10">
+      <section className="mx-auto w-full max-w-screen-2xl px-3 pt-6 md:px-5 md:pt-8">
+        <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-xs font-medium text-black/55">{showingLabel}</p>
+          <select
+            className="h-9 w-44 rounded-md border border-black/20 bg-white px-3 text-xs text-black shadow-sm outline-none"
+            defaultValue="rating"
+          >
+            <option value="rating">Sort by average rating</option>
+            <option value="name">Sort by salon name</option>
+          </select>
         </div>
 
-        {/* Salons Grid */}
-        {paginatedSalons.length > 0 ? (
-          <>
-            <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-              {paginatedSalons.map((salon) => (
-                <SalonCard
-                  key={salon.id}
-                  salon={salon}
-                  onClick={() => onSalonSelect?.(salon.id)}
-                />
-              ))}
+        <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+          {isLoading ? (
+            <div className="flex h-56 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-[#d4a017]" />
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 py-8">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="p-2 border-2 border-black rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-
-                {/* Page Numbers */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .slice(
-                    Math.max(0, currentPage - 2),
-                    Math.min(totalPages, currentPage + 1)
-                  )
-                  .map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`px-4 py-2 rounded font-semibold transition ${
-                        currentPage === page
-                          ? 'bg-black text-white'
-                          : 'bg-gray-200 text-black hover:bg-gray-300'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-
-                {currentPage < totalPages - 2 && (
-                  <span className="text-gray-500">...</span>
-                )}
-
-                {currentPage < totalPages - 1 && (
+          ) : error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</div>
+          ) : (
+            <>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-xs font-medium text-black/60">Top salons</p>
+                <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => handlePageChange(totalPages)}
-                    className="px-4 py-2 bg-gray-200 text-black rounded hover:bg-gray-300 font-semibold transition"
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-black/20 text-black/70 hover:bg-black/5"
+                    type="button"
+                    onClick={() => scrollCarousel('left')}
+                    aria-label="Scroll salons left"
                   >
-                    {totalPages}
+                    <ChevronLeft className="h-4 w-4" />
                   </button>
-                )}
+                  <button
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-black/20 text-black/70 hover:bg-black/5"
+                    type="button"
+                    onClick={() => scrollCarousel('right')}
+                    aria-label="Scroll salons right"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                ref={carouselRef}
+                className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {salons.map((salon) => {
+                  const image = safeImage(salon.images?.[0]);
+                  return (
+                    <article
+                      key={salon.id}
+                      className="group w-56 shrink-0 snap-start overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm transition hover:shadow-md"
+                    >
+                      <button
+                        className="w-full text-left"
+                        onClick={() => onSalonSelect?.(salon.id)}
+                        type="button"
+                      >
+                        <BlurredContainImage src={image} alt={salon.salonName} heightClass="h-40" />
+
+                        <div className="space-y-1 p-3">
+                          <p className="line-clamp-1 text-[11px] text-black/50">{salon.city || 'Sri Lanka'}</p>
+                          <h3 className="line-clamp-2 min-h-9 text-sm font-semibold text-black">{salon.salonName}</h3>
+                          <p className="line-clamp-1 text-[11px] text-black/60">{salon.address || salon.description || 'Premium beauty services'}</p>
+                          <div className="pt-1">
+                            <span className="inline-flex h-7 items-center rounded-md bg-[#1f5eff] px-3 text-xs font-semibold text-white">
+                              Read more
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex items-center justify-center gap-1.5">
+                <button
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-black/20 text-black/70 disabled:cursor-not-allowed disabled:opacity-45"
+                  type="button"
+                  onClick={() => canGoPrev && setSalonPage((p) => p - 1)}
+                  disabled={!canGoPrev}
+                  aria-label="Previous salons page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                {pageNumbers.map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    className={`h-7 min-w-7 rounded-md px-2 text-xs font-semibold ${
+                      pageNum === salonPage
+                        ? 'bg-[#1f5eff] text-white'
+                        : 'border border-black/20 bg-white text-black/70 hover:bg-black/5'
+                    }`}
+                    type="button"
+                    onClick={() => setSalonPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
 
                 <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="p-2 border-2 border-black rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-black/20 text-black/70 disabled:cursor-not-allowed disabled:opacity-45"
+                  type="button"
+                  onClick={() => canGoNext && setSalonPage((p) => p + 1)}
+                  disabled={!canGoNext}
+                  aria-label="Next salons page"
                 >
-                  <ChevronRight size={20} />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">
-              No salons found matching your criteria.
-            </p>
-          </div>
-        )}
-      </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="mx-auto mt-10 w-full max-w-screen-2xl px-3 md:px-5">
+        <h2 className="text-3xl font-bold tracking-tight text-black">Featured Offers</h2>
+        <p className="mt-1 text-sm text-black/55">Scroll to explore amazing deals and services</p>
+
+        <div className="mt-5 space-y-4">
+          {ads.map((ad) => (
+            <article key={ad.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-black">{ad.salonName || 'SalonStore Partner'}</p>
+                  <p className="text-xs text-black/45">{formatPostDate(ad.createdAt)}</p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-[#d4a017]/15 px-2.5 py-1 text-[11px] font-semibold text-[#8a6700]">
+                  Sponsored
+                </span>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <h3 className="text-base font-semibold text-black">{ad.title}</h3>
+                <p className="line-clamp-4 text-sm leading-relaxed text-black/70">{ad.description || 'Exclusive promotion from our salon partner.'}</p>
+                <AdImageLayout images={Array.isArray(ad.imageUrl) ? ad.imageUrl : []} title={ad.title} />
+              </div>
+
+              <div className="flex items-center justify-between border-t border-black/5 px-4 py-3">
+                <div className="inline-flex items-center gap-1 text-xs text-black/50">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Available islandwide
+                </div>
+                <button
+                  type="button"
+                  className="rounded-md bg-[#d4a017] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c79614]"
+                >
+                  Learn More
+                </button>
+              </div>
+            </article>
+          ))}
+
+          {!isLoading && !error && ads.length === 0 && (
+            <div className="rounded-2xl border border-black/10 bg-white p-6 text-center text-sm text-black/60">
+              No active offers available at the moment.
+            </div>
+          )}
+        </div>
+      </section>
     </main>
   );
 }
