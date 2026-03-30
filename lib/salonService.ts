@@ -90,6 +90,12 @@ export async function createSalon(salonData: any) {
   }
 }
 
+export async function getByPrority(page = 1, limit = 10) {
+  return axios.get("/api/salons/by-priority", {
+    params: { page, limit },
+  });
+}
+//todo need to change 
 
 // export async function fetchByOwner(accessToken: string){
 //   const client = axios.create(

@@ -1,56 +1,30 @@
-'use client';
-
-import { useState } from 'react';
+import type { Metadata } from 'next';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import HomePage from '@/components/HomePage';
-import FindSalonPage from '@/components/FindSalonPage';
-import SalonDetailPage from '@/components/SalonDetailPage';
-import PublishPage from '@/components/PublishPage';
-
-type PageType = 'home' | 'find' | 'detail' | 'publish' | 'contact';
+//todo: update canonical URL to your actual domain before deployment
+export const metadata: Metadata = {
+  title: 'SalonStoreLK | Find the Best Salons in Sri Lanka',
+  description:
+    'Discover trusted salons, beauty services, and beauty professionals across Sri Lanka.',
+  alternates: {
+    canonical: 'https://yourdomain.com/',
+  },
+};
 
 export default function Page() {
-  const [currentPage, setCurrentPage] = useState<PageType>('home');
-  const [selectedSalonId, setSelectedSalonId] = useState<string | null>(null);
-
-  const handleNavigate = (page: string) => {
-    setCurrentPage(page as PageType);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleSalonSelect = (salonId: string) => {
-    setSelectedSalonId(salonId);
-    setCurrentPage('detail');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleBackFromDetail = () => {
-    setCurrentPage('find');
-  };
 
   return (
     <div 
       className="min-h-screen flex flex-col bg-cover bg-center bg-fixed bg-no-repeat"
       style={{
-        backgroundImage: currentPage === 'home' ? "url('/background.jpg')" : 'none',
+        backgroundImage: "url('/background.jpg')",
       }}
     >
-      <Header onNavigate={handleNavigate} currentPage={currentPage} />
+      <Header currentPage="home" />
 
       <div className="grow ">
-        {currentPage === 'home' && <HomePage onNavigate={handleNavigate} />}
-        {currentPage === 'find' && (
-          <FindSalonPage onSalonSelect={handleSalonSelect} />
-        )}
-        {currentPage === 'detail' && selectedSalonId && (
-          <SalonDetailPage
-            salonId={selectedSalonId}
-            onBack={handleBackFromDetail}
-            onSalonSelect={handleSalonSelect}
-          />
-        )}
-        {currentPage === 'publish' && <PublishPage />}
+        <HomePage />
       </div>
 
      <Footer />

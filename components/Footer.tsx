@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
 
@@ -40,19 +42,19 @@ export default function Footer() {
               <h3 className="text-[#d4a32b] font-bold text-lg mb-4">Quick Links</h3>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-[#d4a32b] transition">
+                  <Link href="/find-salon" className="text-gray-300 hover:text-[#d4a32b] transition">
                     Find Salons
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-[#d4a32b] transition">
+                  <Link href="/auth/register" className="text-gray-300 hover:text-[#d4a32b] transition">
                     Publish Your Salon
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-[#d4a32b] transition">
+                  <Link href="/" className="text-gray-300 hover:text-[#d4a32b] transition">
                     Contact Us
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <a href="#" className="text-gray-300 hover:text-[#d4a32b] transition">

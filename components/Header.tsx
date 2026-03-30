@@ -55,6 +55,22 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
     document.documentElement.lang = lang.code;
   }
 
+  function handleLegacyNavigation(page: string) {
+    if (onNavigate) {
+      onNavigate(page);
+      return;
+    }
+
+    if (page === 'publish') {
+      router.push('/auth/register');
+      return;
+    }
+
+    if (page === 'contact') {
+      router.push('/find-salon');
+    }
+  }
+
   // ── Language button with dropdown ──
   function LangButton({ refProp, above = false }: { refProp: React.RefObject<HTMLDivElement | null>; above?: boolean }) {
     return (
@@ -183,8 +199,8 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
       <div className="hidden md:flex items-center gap-6 px-6 py-3">
 
         {/* Logo */}
-        <button
-          onClick={() => onNavigate?.('home')}
+        <Link
+          href="/"
           className="flex items-center gap-3 hover:opacity-90 transition-opacity focus:outline-none flex-shrink-0"
           aria-label="Go to homepage"
         >
@@ -199,27 +215,36 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
           <span className="text-black font-bold text-lg tracking-tight leading-tight">
             SalonStore<span className="text-white">.lk</span>
           </span>
-        </button>
+        </Link>
 
         <div className="w-px h-8 bg-black/20 flex-shrink-0" />
 
         {/* Nav links */}
         <nav className="flex items-center gap-1">
-          {[
-            { key: 'find', label: 'Find Salons' },
-            { key: 'publish', label: 'Publish Your Salon' },
-            { key: 'contact', label: 'Contact Us' },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => onNavigate?.(key)}
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors hover:bg-black/10 ${
-                currentPage === key ? 'bg-black/15 text-black' : 'text-black/80'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          <Link
+            href="/find-salon"
+            className={`px-3 py-2 rounded text-sm font-medium transition-colors hover:bg-black/10 ${
+              currentPage === 'find' ? 'bg-black/15 text-black' : 'text-black/80'
+            }`}
+          >
+            Find Salons
+          </Link>
+          <button
+            onClick={() => handleLegacyNavigation('publish')}
+            className={`px-3 py-2 rounded text-sm font-medium transition-colors hover:bg-black/10 ${
+              currentPage === 'publish' ? 'bg-black/15 text-black' : 'text-black/80'
+            }`}
+          >
+            Publish Your Salon
+          </button>
+          <button
+            onClick={() => handleLegacyNavigation('contact')}
+            className={`px-3 py-2 rounded text-sm font-medium transition-colors hover:bg-black/10 ${
+              currentPage === 'contact' ? 'bg-black/15 text-black' : 'text-black/80'
+            }`}
+          >
+            Contact Us
+          </button>
         </nav>
 
         <div className="flex-1" />
@@ -268,7 +293,7 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
       {/* ── MOBILE LAYOUT ── */}
       <div className="md:hidden">
         <div className="flex items-center justify-between px-4 py-3">
-          <button onClick={() => onNavigate?.('home')} className="flex items-center gap-2" aria-label="Go to homepage">
+          <Link href="/" className="flex items-center gap-2" aria-label="Go to homepage">
             <Image
               src="/logo.png"
               alt="SalonStore.lk"
@@ -280,7 +305,7 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
             <span className="text-black font-bold text-base tracking-tight">
               SalonStore<span className="text-white">.lk</span>
             </span>
-          </button>
+          </Link>
 
           <div className="flex items-center gap-2">
             <div className="flex items-center bg-white/80 rounded-lg px-3 py-1.5 gap-2">
@@ -305,9 +330,9 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
 
         {isMenuOpen && (
           <div className="bg-black/95 text-white py-4 px-4 space-y-1">
-            <button onClick={() => { onNavigate?.('find'); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2.5 hover:bg-white/10 rounded transition text-sm">Find Salons</button>
-            <button onClick={() => { onNavigate?.('publish'); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2.5 hover:bg-white/10 rounded transition text-sm">Publish Your Salon</button>
-            <button onClick={() => { onNavigate?.('contact'); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2.5 hover:bg-white/10 rounded transition text-sm">Contact Us</button>
+            <Link href="/find-salon" onClick={() => setIsMenuOpen(false)} className="block w-full text-left px-4 py-2.5 hover:bg-white/10 rounded transition text-sm">Find Salons</Link>
+            <button onClick={() => { handleLegacyNavigation('publish'); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2.5 hover:bg-white/10 rounded transition text-sm">Publish Your Salon</button>
+            <button onClick={() => { handleLegacyNavigation('contact'); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2.5 hover:bg-white/10 rounded transition text-sm">Contact Us</button>
 
             <div className="border-t border-white/10 pt-3 mt-2 flex items-center justify-between px-2">
               {/* Social icons */}
