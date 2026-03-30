@@ -1,8 +1,6 @@
-interface HomePageProps {
-  onNavigate?: (page: string) => void;
-}
+import Link from 'next/link';
 
-export default function HomePage({ onNavigate }: HomePageProps) {
+export default function HomePage() {
   return (
     <main className="relative pb-[350px] sm:pb-[320px] md:pb-[280px] lg:pb-[280px] ">
       {/* Hero Section */}
@@ -32,18 +30,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
           {/* CTA Buttons */}
           <div className="mb-8 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-            <button
-              onClick={() => onNavigate?.('find')}
+            <Link
+              href="/find-salon"
               className="w-full sm:w-auto bg-black hover:bg-[#e1a816]/80 text-white font-bold px-6 sm:px-8 py-3 uppercase transition text-sm"
             >
               FIND YOUR SALON
-            </button>
-            <button
-              onClick={() => onNavigate?.('publish')}
+            </Link>
+            <Link
+              href="/auth/register"
               className="w-full sm:w-auto bg-black hover:bg-[#e1a816]/80 text-white font-bold px-6 sm:px-8 py-3 uppercase transition text-sm"
             >
               PUBLISH YOUR SALON
-            </button>
+            </Link>
           </div>
 
           {/* YouTube Video Embed */}
