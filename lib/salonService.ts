@@ -90,6 +90,25 @@ export async function createSalon(salonData: any) {
   }
 }
 
+export async function updateSalon(id: string, salonData: any, accessToken?: string) {
+  const token = accessToken ?? (typeof window !== "undefined" ? sessionStorage.getItem("accessToken") : null);
+
+  try {
+    const { data } = await axios.patch(`/api/salons/${id}/update`, salonData, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    return data;
+  } catch (error: any) {
+    if (error?.response?.status !== 401) throw error;
+
+    const nextAccessToken = await refreshAccessToken();
+    const { data } = await axios.patch(`/api/salons/${id}/update`, salonData, {
+      headers: { Authorization: `Bearer ${nextAccessToken}` },
+    });
+    return data;
+  }
+}
+
 export async function getByPrority(page = 1, limit = 10) {
   return axios.get("/api/salons/by-priority", {
     params: { page, limit },
