@@ -24,9 +24,10 @@ import { Search as SearchIcon } from '@mui/icons-material';
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { getAllUsers, suspendUser, unsuspendUser } from '@/lib/userService';
+import { getAllUsers, suspendUser, unsuspendUser, getUserById } from '@/lib/userService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import UserViewDialog from '@/components/UserViewDialog';
 
 // Assuming basic user type based on common standard fields
 interface User {
@@ -47,9 +48,9 @@ const statusColor = (status: string): 'success' | 'warning' | 'error' | 'default
     return 'default';
 };
 
-const UserTable = ({ users, isDark, onSuspend, onReactive }: { users: User[]; isDark: boolean; onSuspend?: (id: string) => void; onReactive?: (id: string) => void }) => {
+const UserTable = ({ users, isDark, onView, onSuspend, onReactive }: { users: User[]; isDark: boolean; onView?: (id: string) => void; onSuspend?: (id: string) => void; onReactive?: (id: string) => void }) => {
     const headers = ['Name', 'Email', 'Role', 'Status'];
-    if (onSuspend || onReactive) headers.push('Actions');
+    if (onView || onSuspend || onReactive) headers.push('Actions');
 
     const cellSx = (extra?: object) => ({
         py: 1.6,
@@ -93,7 +94,9 @@ const UserTable = ({ users, isDark, onSuspend, onReactive }: { users: User[]; is
                             <Box
                                 component="tr"
                                 key={id}
+                                onClick={() => onView && onView(id)}
                                 sx={{
+                                    cursor: onView ? 'pointer' : 'default',
                                     '&:hover': {
                                         backgroundColor: isDark ? 'rgba(167, 139, 250, 0.08)' : 'rgba(167, 139, 250, 0.06)',
                                     },
@@ -118,7 +121,7 @@ const UserTable = ({ users, isDark, onSuspend, onReactive }: { users: User[]; is
                                         />
                                     )}
                                 </Box>
-                                {(onSuspend || onReactive) && (
+                                {(onView || onSuspend || onReactive) && (
                                     <Box component="td" sx={cellSx()}>
                                         <Stack direction="row" spacing={1}>
                                             {onSuspend && user.status?.toUpperCase() !== 'SUSPENDED' && (
@@ -189,6 +192,32 @@ export default function AdminUsersPage() {
     const [suspendReason, setSuspendReason] = useState('');
     const [reactiveConfirmState, setReactiveConfirmState] = useState<string | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
+
+    const [viewTargetUserId, setViewTargetUserId] = useState<string | null>(null);
+    const [viewTargetData, setViewTargetData] = useState<any | null>(null);
+    const [isViewOpen, setIsViewOpen] = useState(false);
+    const [isLoadingView, setIsLoadingView] = useState(false);
+
+    const requestView = async (userId: string) => {
+        setIsViewOpen(true);
+        setViewTargetUserId(userId);
+        setIsLoadingView(true);
+        setViewTargetData(null);
+        try {
+            const data = await getUserById(userId);
+            setViewTargetData(data);
+        } catch (err: any) {
+            setError(err instanceof Error ? err.message : 'Failed to fetch user details.');
+        } finally {
+            setIsLoadingView(false);
+        }
+    };
+
+    const closeViewDialog = () => {
+        setIsViewOpen(false);
+        setViewTargetUserId(null);
+        setViewTargetData(null);
+    };
 
     const requestSuspend = (userId: string) => {
         setSuspendConfirmState(userId);
@@ -419,6 +448,7 @@ export default function AdminUsersPage() {
                                                 <UserTable
                                                     users={paginatedList}
                                                     isDark={isDark}
+                                                    onView={requestView}
                                                     onSuspend={
                                                         (activeTab === 'salonOwners' || activeTab === 'customers')
                                                             ? requestSuspend
@@ -505,6 +535,13 @@ export default function AdminUsersPage() {
                 onConfirm={confirmReactive}
                 onCancel={cancelReactiveConfirm}
                 loading={processingId === reactiveConfirmState}
+            />
+
+            <UserViewDialog
+                open={isViewOpen}
+                user={viewTargetData}
+                loading={isLoadingView}
+                onClose={closeViewDialog}
             />
         </>
     );
