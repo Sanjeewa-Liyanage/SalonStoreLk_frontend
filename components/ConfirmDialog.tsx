@@ -17,11 +17,12 @@ import {
 	HelpOutline as HelpOutlineIcon,
 	InfoOutlined as InfoOutlinedIcon,
 	WarningAmberOutlined as WarningAmberOutlinedIcon,
+    CheckCircleOutline as CheckCircleOutlineIcon,
 } from '@mui/icons-material';
 import { useMuiTheme } from '@/context/MuiThemeContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export type ConfirmDialogVariant = 'info' | 'warning' | 'danger' | 'question';
+export type ConfirmDialogVariant = 'info' | 'warning' | 'danger' | 'question' | 'success';
 
 interface ConfirmDialogProps {
 	/** Controls visibility */
@@ -50,7 +51,7 @@ const variantConfig: Record<
 	{
 		icon: React.ReactNode;
 		iconColor: string;
-		confirmColor: 'error' | 'warning' | 'primary' | 'info';
+		confirmColor: 'error' | 'warning' | 'primary' | 'info' | 'success';
 		bgLight: string;
 		bgDark: string;
 	}
@@ -83,6 +84,13 @@ const variantConfig: Record<
 		bgLight: 'rgba(167,139,250,0.08)',
 		bgDark:  'rgba(167,139,250,0.12)',
 	},
+    success: {
+        icon: <CheckCircleOutlineIcon sx={{ fontSize: 36 }} />,
+        iconColor: '#22c55e',
+        confirmColor: 'success',
+        bgLight: 'rgba(34,197,94,0.08)',
+        bgDark:  'rgba(34,197,94,0.12)',
+    },
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
