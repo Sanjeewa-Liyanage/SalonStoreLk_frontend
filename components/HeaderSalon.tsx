@@ -35,12 +35,11 @@ function getGreeting(): string {
 
 export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean, setSidebarOpen: (open: boolean) => void }) {
   const { isDark, toggleTheme } = useMuiTheme();
-  const { user, setUser } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
 
-  const handleLogout = async () => {
-    await logoutUser();
-    setUser(null);
+  const handleLogout = () => {
+    logout();
     router.push('/auth/login');
   };
 
