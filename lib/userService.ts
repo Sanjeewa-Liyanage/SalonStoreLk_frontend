@@ -74,3 +74,24 @@ export async function unsuspendUser(userId: string) {
         return data;
     }
 }
+
+export async function getUserById(userId: string) {
+    const token = resolveAccessToken();
+    if (!token) throw new Error("No access token found.");
+    
+    try {
+        const { data } = await axios.get(`/api/user/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return data;
+    } catch (error: any) {
+        if (error?.response?.status !== 401) throw error;
+        
+        const nextAccessToken = await refreshAccessToken();
+        const { data } = await axios.get(`/api/user/${userId}`, {
+            headers: { Authorization: `Bearer ${nextAccessToken}` },
+        });
+        return data;
+    }
+}
+
