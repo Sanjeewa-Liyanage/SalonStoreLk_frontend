@@ -54,3 +54,23 @@ export async function suspendUser(userId: string, reason: string) {
         return data;
     }
 }
+
+export async function unsuspendUser(userId: string) {
+    const token = resolveAccessToken();
+    if (!token) throw new Error("No access token found.");
+    
+    try {
+        const { data } = await axios.patch(`/api/user/unsuspend/${userId}`, {}, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return data;
+    } catch (error: any) {
+        if (error?.response?.status !== 401) throw error;
+        
+        const nextAccessToken = await refreshAccessToken();
+        const { data } = await axios.patch(`/api/user/unsuspend/${userId}`, {}, {
+            headers: { Authorization: `Bearer ${nextAccessToken}` },
+        });
+        return data;
+    }
+}

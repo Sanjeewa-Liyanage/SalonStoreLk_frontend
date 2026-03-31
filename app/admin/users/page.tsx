@@ -24,7 +24,7 @@ import { Search as SearchIcon } from '@mui/icons-material';
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { getAllUsers, suspendUser } from '@/lib/userService';
+import { getAllUsers, suspendUser, unsuspendUser } from '@/lib/userService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
@@ -47,9 +47,9 @@ const statusColor = (status: string): 'success' | 'warning' | 'error' | 'default
     return 'default';
 };
 
-const UserTable = ({ users, isDark, onSuspend }: { users: User[]; isDark: boolean; onSuspend?: (id: string) => void }) => {
+const UserTable = ({ users, isDark, onSuspend, onReactive }: { users: User[]; isDark: boolean; onSuspend?: (id: string) => void; onReactive?: (id: string) => void }) => {
     const headers = ['Name', 'Email', 'Role', 'Status'];
-    if (onSuspend) headers.push('Actions');
+    if (onSuspend || onReactive) headers.push('Actions');
 
     const cellSx = (extra?: object) => ({
         py: 1.6,
@@ -118,22 +118,38 @@ const UserTable = ({ users, isDark, onSuspend }: { users: User[]; isDark: boolea
                                         />
                                     )}
                                 </Box>
-                                {onSuspend && (
+                                {(onSuspend || onReactive) && (
                                     <Box component="td" sx={cellSx()}>
-                                        {user.status?.toUpperCase() !== 'SUSPENDED' && (
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                color="error"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onSuspend(id);
-                                                }}
-                                                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                                            >
-                                                Suspend
-                                            </Button>
-                                        )}
+                                        <Stack direction="row" spacing={1}>
+                                            {onSuspend && user.status?.toUpperCase() !== 'SUSPENDED' && (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="error"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onSuspend(id);
+                                                    }}
+                                                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                                                >
+                                                    Suspend
+                                                </Button>
+                                            )}
+                                            {onReactive && user.status?.toUpperCase() === 'SUSPENDED' && (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="success"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onReactive(id);
+                                                    }}
+                                                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                                                >
+                                                    Reactive
+                                                </Button>
+                                            )}
+                                        </Stack>
                                     </Box>
                                 )}
                             </Box>
@@ -167,9 +183,11 @@ export default function AdminUsersPage() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const rowsPerPage = 10;
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const [suspendConfirmState, setSuspendConfirmState] = useState<string | null>(null);
     const [suspendReason, setSuspendReason] = useState('');
+    const [reactiveConfirmState, setReactiveConfirmState] = useState<string | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
     const requestSuspend = (userId: string) => {
@@ -188,6 +206,7 @@ export default function AdminUsersPage() {
         try {
             setError('');
             await suspendUser(suspendConfirmState, suspendReason.trim() || 'Rules violated');
+            setRefreshTrigger((prev) => prev + 1);
 
             setUsers((prev) =>
                 prev.map((u) => {
@@ -207,6 +226,43 @@ export default function AdminUsersPage() {
     const suspendTargetUser = useMemo(
         () => users.find((u) => (u.id || u._id) === suspendConfirmState),
         [users, suspendConfirmState]
+    );
+
+    const requestReactive = (userId: string) => {
+        setReactiveConfirmState(userId);
+    };
+
+    const cancelReactiveConfirm = () => {
+        if (processingId) return;
+        setReactiveConfirmState(null);
+    };
+
+    const confirmReactive = async () => {
+        if (!reactiveConfirmState) return;
+        setProcessingId(reactiveConfirmState);
+        try {
+            setError('');
+            await unsuspendUser(reactiveConfirmState);
+            setRefreshTrigger((prev) => prev + 1);
+
+            setUsers((prev) =>
+                prev.map((u) => {
+                    const id = u.id || u._id;
+                    if (id === reactiveConfirmState) return { ...u, status: 'ACTIVE' };
+                    return u;
+                })
+            );
+        } catch (err: any) {
+            setError(err instanceof Error ? err.message : 'Failed to reactivate user.');
+        } finally {
+            setProcessingId(null);
+            setReactiveConfirmState(null);
+        }
+    };
+
+    const reactiveTargetUser = useMemo(
+        () => users.find((u) => (u.id || u._id) === reactiveConfirmState),
+        [users, reactiveConfirmState]
     );
 
     // Load users conditionally based on filters
@@ -230,7 +286,7 @@ export default function AdminUsersPage() {
         };
 
         loadUsers();
-    }, [roleParam, statusParam]);
+    }, [roleParam, statusParam, refreshTrigger]);
 
     // Reset search when changing tabs
     useEffect(() => {
@@ -368,6 +424,11 @@ export default function AdminUsersPage() {
                                                             ? requestSuspend
                                                             : undefined
                                                     }
+                                                    onReactive={
+                                                        (activeTab === 'suspended' || activeTab === 'all')
+                                                            ? requestReactive
+                                                            : undefined
+                                                    }
                                                 />
                                             )}
 
@@ -426,6 +487,24 @@ export default function AdminUsersPage() {
                 onConfirm={confirmSuspend}
                 onCancel={cancelSuspendConfirm}
                 loading={processingId === suspendConfirmState}
+            />
+
+            <ConfirmDialog
+                open={Boolean(reactiveConfirmState)}
+                title="Reactive User"
+                message={
+                    <>
+                        {reactiveTargetUser
+                            ? `Are you sure you want to reactive user "${reactiveTargetUser.name || reactiveTargetUser.email || 'this user'}"?`
+                            : 'Are you sure you want to reactive this user?'}
+                    </>
+                }
+                variant="success"
+                confirmLabel="Yes, Reactive"
+                cancelLabel="Cancel"
+                onConfirm={confirmReactive}
+                onCancel={cancelReactiveConfirm}
+                loading={processingId === reactiveConfirmState}
             />
         </>
     );
