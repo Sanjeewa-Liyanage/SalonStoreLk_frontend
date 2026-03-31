@@ -56,8 +56,9 @@ const MENU_ITEMS = [
     href: '/admin/users',
     children: [
       { label: 'All Users', href: '/admin/users' },
-      { label: 'Active Users', href: '/admin/users/active' },
-      { label: 'Inactive Users', href: '/admin/users/inactive' },
+      { label: 'Salon Owners', href: '/admin/users?role=SALON_OWNER' },
+      { label: 'Customers', href: '/admin/users?role=CUSTOMER' },
+      { label: 'Suspended Users', href: '/admin/users?status=SUSPENDED' },
     ],
   },
   {
