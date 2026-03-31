@@ -4,6 +4,9 @@ import { useState } from "react";
 import Image from 'next/image';
 import { loginUser, getUserProfile } from "@/lib/authService";
 import { useRouter } from "next/navigation";
+import { useAppDispatch } from "@/lib/store/hooks";
+import { setCredentials } from "@/lib/store/slices/authSlice";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,8 +15,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
-
-    const router = useRouter();
+  const dispatch = useAppDispatch();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
      e.preventDefault();
@@ -31,15 +34,16 @@ export default function LoginPage() {
       const userProfile = await getUserProfile();
       sessionStorage.setItem("user", JSON.stringify(userProfile));
       console.log("User profile after login:", userProfile);
+      
+      // Update Redux state
+      dispatch(setCredentials({ user: userProfile, accessToken: data.backendTokens.accessToken }));
+
       if(userProfile.role === "ADMIN" && userProfile.adminLevel==="SUPER") {
         router.push("/admin/dashboard");
-        
         return;
       }else if(userProfile.role === "SALON_OWNER"){
         router.push("/salon_owner/dashboard");
       }
-      
-      
 
     } catch (err: any) {
       alert(err?.response?.data?.message || "Login failed. Please try again.");

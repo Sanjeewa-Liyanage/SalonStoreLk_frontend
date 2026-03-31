@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getUserProfile, refreshAccessToken } from '@/lib/authService';
 import { useAuth } from '@/context/AuthContext';
+import { useAppDispatch } from '@/lib/store/hooks';
+import { setCredentials } from '@/lib/store/slices/authSlice';
 import SalonLoader from './Loader';
 
 export default function AuthGuard({ children, allowedRole }: { children: React.ReactNode, allowedRole: string }) {
   const [authorized, setAuthorized] = useState(false);
   const { setUser } = useAuth();
+  const dispatch = useAppDispatch();
   const router = useRouter();
 
   useEffect(() => {
@@ -20,7 +23,8 @@ export default function AuthGuard({ children, allowedRole }: { children: React.R
 
       try {
         const user = await getUserProfile();
-        setUser(user); // Set user in context
+        setUser(user); // Set user in context (legacy)
+        dispatch(setCredentials({ user, accessToken: token })); // Set user in Redux
         if (user.role !== allowedRole) {
           router.push(user.role === 'ADMIN' ? '/admin/dashboard' : '/salon_owner/dashboard');
         } else {
@@ -32,7 +36,8 @@ export default function AuthGuard({ children, allowedRole }: { children: React.R
           try {
             const newToken = await refreshAccessToken();
             const user = await getUserProfile();
-            setUser(user); // Set user in context
+            setUser(user); // Set user in context (legacy)
+            dispatch(setCredentials({ user, accessToken: newToken })); // Set user in Redux
             if (user.role !== allowedRole) {
               router.push(user.role === 'ADMIN' ? '/admin/dashboard' : '/salon_owner/dashboard');
             } else {
@@ -51,6 +56,6 @@ export default function AuthGuard({ children, allowedRole }: { children: React.R
     checkAuth();
   }, [allowedRole, router, setUser]);
 
-  if (!authorized) return <div className="flex justify-center items-center min-h-screen"><SalonLoader /></div>; 
+  if (!authorized) return <div className="flex justify-center items-center min-h-screen"><SalonLoader /></div>;
   return <>{children}</>;
 }

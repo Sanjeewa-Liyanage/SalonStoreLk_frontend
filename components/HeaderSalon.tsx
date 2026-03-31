@@ -76,7 +76,7 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
       {/* Right Actions */}
       <div className="flex items-center gap-2 md:gap-6">
         {/* Theme Toggle */}
-        <button 
+        <button
           onClick={toggleTheme}
           className="p-2 text-neutral-500 hover:bg-neutral-100 rounded-full transition-colors"
           title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
@@ -107,7 +107,7 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
             </div>
             <ChevronDown size={14} className="text-neutral-400 hidden md:block" />
           </DropdownMenuTrigger>
-          
+
           <DropdownMenuContent align="end" className="w-56 mt-2">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
