@@ -42,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sync with Redux Store
       dispatch(setCredentials({ user: userData, accessToken: latestToken }));
       setUser(userData);
+      sessionStorage.setItem("user", JSON.stringify(userData));
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
       logout();
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     sessionStorage.removeItem("accessToken");
     sessionStorage.removeItem("refreshToken");
+    sessionStorage.removeItem("user");
     dispatch(logoutAction()); // Trigger Redux logout
     setUser(null);
   };
