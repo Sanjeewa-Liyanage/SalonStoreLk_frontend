@@ -1,6 +1,6 @@
 'use client';
 
-import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
+import { type SyntheticEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
 	Alert,
@@ -29,7 +29,18 @@ import {
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { fetchAllSalons, activateSalon, rejectSalon, suspendSalon, unsuspendSalon, fetchSalonDetails } from '@/lib/salonService';
+import {
+	activateSalon,
+	fetchActiveSalons,
+	fetchAllSalons,
+	fetchPendingSalons,
+	fetchRejectedSalons,
+	fetchSalonDetails,
+	fetchSuspendedSalons,
+	rejectSalon,
+	suspendSalon,
+	unsuspendSalon,
+} from '@/lib/salonService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SuspendReasonDialog from '@/components/SuspendReasonDialog';
@@ -70,6 +81,99 @@ const statusColor = (status: string): 'success' | 'warning' | 'error' | 'default
 const formatDate = (createdAt?: Salon['createdAt']) => {
 	if (!createdAt?._seconds) return '-';
 	return new Date(createdAt._seconds * 1000).toLocaleDateString();
+};
+
+interface SalonListPayload {
+	data?: Salon[];
+	items?: Salon[];
+	salons?: Salon[];
+	total?: number;
+	count?: number;
+	totalItems?: number;
+	meta?: {
+		total?: number;
+		totalItems?: number;
+	};
+	pagination?: Partial<PaginationMeta>;
+}
+
+interface PaginationMeta {
+	page: number;
+	limit: number;
+	totalItems: number;
+	totalPages: number;
+	hasPrevious: boolean;
+	hasNext: boolean;
+}
+
+const extractSalonRows = (payload: SalonListPayload | Salon[] | null | undefined): Salon[] => {
+	if (Array.isArray(payload)) return payload;
+	if (Array.isArray(payload?.data)) return payload.data;
+	if (Array.isArray(payload?.items)) return payload.items;
+	if (Array.isArray(payload?.salons)) return payload.salons;
+	return [];
+};
+
+const extractSalonTotal = (payload: SalonListPayload | Salon[] | null | undefined, fallback: number): number => {
+	if (Array.isArray(payload)) return payload.length;
+
+	const totalCandidates = [
+		payload?.total,
+		payload?.totalItems,
+		payload?.count,
+		payload?.meta?.total,
+		payload?.meta?.totalItems,
+		payload?.pagination?.totalItems,
+	];
+
+	const numericTotal = totalCandidates.find((value) => typeof value === 'number');
+	return typeof numericTotal === 'number' ? numericTotal : fallback;
+};
+
+const extractPaginationMeta = (
+	payload: SalonListPayload | Salon[] | null | undefined,
+	fallbackPage: number,
+	fallbackLimit: number,
+	fallbackCount: number
+): PaginationMeta => {
+	if (Array.isArray(payload)) {
+		return {
+			page: fallbackPage,
+			limit: fallbackLimit,
+			totalItems: payload.length,
+			totalPages: 1,
+			hasPrevious: fallbackPage > 1,
+			hasNext: false,
+		};
+	}
+
+	const totalItems = extractSalonTotal(payload, fallbackCount);
+	const totalPagesFromResponse = payload?.pagination?.totalPages;
+	const totalPages =
+		typeof totalPagesFromResponse === 'number' && totalPagesFromResponse > 0
+			? totalPagesFromResponse
+			: Math.max(1, Math.ceil(totalItems / Math.max(1, fallbackLimit)));
+
+	return {
+		page:
+			typeof payload?.pagination?.page === 'number' && payload.pagination.page > 0
+				? payload.pagination.page
+				: fallbackPage,
+		limit:
+			typeof payload?.pagination?.limit === 'number' && payload.pagination.limit > 0
+				? payload.pagination.limit
+				: fallbackLimit,
+		totalItems,
+		totalPages,
+		hasPrevious:
+			typeof payload?.pagination?.hasPrevious === 'boolean'
+				? payload.pagination.hasPrevious
+				: fallbackPage > 1,
+		hasNext:
+			typeof payload?.pagination?.hasNext === 'boolean'
+				? payload.pagination.hasNext
+				: fallbackPage < totalPages,
+	};
 };
 
 // ─── Reusable table component to avoid repetition ────────────────────────────
@@ -257,8 +361,23 @@ export default function AdminSalonsPage() {
 	const { isDark } = useMuiTheme();
 	const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
-	// ── Single source of truth: all salons fetched once ──
 	const [allSalons, setAllSalons] = useState<Salon[]>([]);
+	const [totalItems, setTotalItems] = useState(0);
+	const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
+		page: 1,
+		limit: 10,
+		totalItems: 0,
+		totalPages: 1,
+		hasPrevious: false,
+		hasNext: false,
+	});
+	const [counts, setCounts] = useState({
+		total: 0,
+		active: 0,
+		pending: 0,
+		suspended: 0,
+		rejected: 0,
+	});
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 
@@ -284,98 +403,132 @@ export default function AdminSalonsPage() {
 	const [loadingDialog, setLoadingDialog] = useState(false);
 	const [dialogError, setDialogError] = useState<string | null>(null);
 
-	const rowsPerPage = 8;
+	const rowsPerPage = 10;
 	const activeTab = normalizeSalonTab(searchParams.get('tab'));
 
-	// ── Fetch ONCE on mount — no tab dependency ──
-	useEffect(() => {
-		const loadSalons = async () => {
+	const fetchSalonsByTab = useCallback((tab: SalonTab, token: string, targetPage: number, limit: number) => {
+		switch (tab) {
+			case 'active':
+				return fetchActiveSalons(token, { page: targetPage, limit });
+			case 'pending':
+				return fetchPendingSalons(token, { page: targetPage, limit });
+			case 'suspended':
+				return fetchSuspendedSalons(token, { page: targetPage, limit });
+			case 'rejected':
+				return fetchRejectedSalons(token, { page: targetPage, limit });
+			default:
+				return fetchAllSalons(token, { page: targetPage, limit });
+		}
+	}, []);
+
+	const loadPagedSalons = useCallback(
+		async (targetPage: number, tab: SalonTab) => {
 			setLoading(true);
 			setError('');
+
 			try {
 				const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 				if (!token) throw new Error('No access token found. Please login again.');
 
-				const payload = await fetchAllSalons(token);
-				setAllSalons(payload.data || []);
+				const payload = (await fetchSalonsByTab(tab, token, targetPage, rowsPerPage)) as SalonListPayload;
+				const salons = extractSalonRows(payload);
+				const nextPaginationMeta = extractPaginationMeta(payload, targetPage, rowsPerPage, salons.length);
+
+				setAllSalons(salons);
+				setTotalItems(nextPaginationMeta.totalItems);
+				setPaginationMeta(nextPaginationMeta);
+
+				if (nextPaginationMeta.page !== targetPage) {
+					setPage(nextPaginationMeta.page);
+				}
 			} catch (fetchError) {
 				setError(fetchError instanceof Error ? fetchError.message : 'Something went wrong');
+				setAllSalons([]);
+				setTotalItems(0);
+				setPaginationMeta((prev) => ({ ...prev, hasNext: false, hasPrevious: page > 1 }));
 			} finally {
 				setLoading(false);
 			}
-		};
-
-		loadSalons();
-	}, []); // ← empty array: runs once only
-
-	// ── Reset search + page when tab changes ──
-	useEffect(() => {
-		setSearch('');
-		setPage(1);
-	}, [activeTab]);
-
-	// ── Derive filtered lists from allSalons ──
-	const activeSalons = useMemo(
-		() => allSalons.filter((s) => s.status.toUpperCase() === 'ACTIVE'),
-		[allSalons]
+		},
+		[fetchSalonsByTab, page, rowsPerPage]
 	);
 
-	const pendingSalons = useMemo(
-		() => allSalons.filter((s) => s.status.toUpperCase().includes('PENDING')),
-		[allSalons]
-	);
+	const loadSummaryCounts = useCallback(async () => {
+		try {
+			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
+			if (!token) return;
 
-	const suspendedSalons = useMemo(
-		() => allSalons.filter((s) => s.status.toUpperCase() === 'SUSPENDED'),
-		[allSalons]
-	);
-	const rejectedSalons = useMemo(
-		() => allSalons.filter((s) => s.status.toUpperCase() === 'REJECTED'),
-		[allSalons]
-	);
-	// ── Summary counts (always derived from allSalons) ──
-	const counts = useMemo(
-		() => ({
-			total: allSalons.length,
-			active: activeSalons.length,
-			pending: pendingSalons.length,
-			suspended: suspendedSalons.length,
-			rejected: rejectedSalons.length,
-		}),
-		[allSalons, activeSalons, pendingSalons, suspendedSalons, rejectedSalons]
-	);
+			const requests = [
+				fetchAllSalons(token, { page: 1, limit: 1 }),
+				fetchActiveSalons(token, { page: 1, limit: 1 }),
+				fetchPendingSalons(token, { page: 1, limit: 1 }),
+				fetchSuspendedSalons(token, { page: 1, limit: 1 }),
+				fetchRejectedSalons(token, { page: 1, limit: 1 }),
+			] as const;
 
-	// ── Pick the correct list for the active tab ──
-	const currentList = useMemo(() => {
-		switch (activeTab) {
-			case 'active':    return activeSalons;
-			case 'pending':   return pendingSalons;
-			case 'suspended': return suspendedSalons;
-			case 'rejected':  return rejectedSalons;
+			const [allResult, activeResult, pendingResult, suspendedResult, rejectedResult] =
+				await Promise.allSettled(requests);
 
-			default:          return allSalons;
+			setCounts({
+				total:
+					allResult.status === 'fulfilled'
+						? extractSalonTotal(allResult.value as SalonListPayload, extractSalonRows(allResult.value as SalonListPayload).length)
+						: 0,
+				active:
+					activeResult.status === 'fulfilled'
+						? extractSalonTotal(activeResult.value as SalonListPayload, extractSalonRows(activeResult.value as SalonListPayload).length)
+						: 0,
+				pending:
+					pendingResult.status === 'fulfilled'
+						? extractSalonTotal(pendingResult.value as SalonListPayload, extractSalonRows(pendingResult.value as SalonListPayload).length)
+						: 0,
+				suspended:
+					suspendedResult.status === 'fulfilled'
+						? extractSalonTotal(suspendedResult.value as SalonListPayload, extractSalonRows(suspendedResult.value as SalonListPayload).length)
+						: 0,
+				rejected:
+					rejectedResult.status === 'fulfilled'
+						? extractSalonTotal(rejectedResult.value as SalonListPayload, extractSalonRows(rejectedResult.value as SalonListPayload).length)
+						: 0,
+			});
+		} catch {
+			// Counts are not critical for table rendering.
 		}
-	}, [activeTab, allSalons, activeSalons, pendingSalons, suspendedSalons, rejectedSalons]);
+	}, []);
 
-	// ── Apply search filter on top of the current list ──
+	// ── Fetch current page from backend whenever tab/page changes ──
+	useEffect(() => {
+		void loadPagedSalons(page, activeTab);
+	}, [activeTab, loadPagedSalons, page]);
+
+	useEffect(() => {
+		void loadSummaryCounts();
+	}, [loadSummaryCounts]);
+
+	// ── Apply search filter on top of the current backend page ──
 	const filteredList = useMemo(() => {
 		const query = search.toLowerCase().trim();
-		if (!query) return currentList;
-		return currentList.filter(
+		if (!query) return allSalons;
+		return allSalons.filter(
 			(s) =>
 				s.salonName.toLowerCase().includes(query) ||
 				s.salonCode.toLowerCase().includes(query) ||
 				s.city.toLowerCase().includes(query) ||
 				s.phoneNumber.toLowerCase().includes(query)
 		);
-	}, [currentList, search]);
+	}, [allSalons, search]);
 
-	// ── Pagination ──
-	const totalPages = Math.max(1, Math.ceil(filteredList.length / rowsPerPage));
-	const paginatedList = filteredList.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+	// ── Pagination from backend totals (local search only filters current page) ──
+	const totalPages = useMemo(
+		() => Math.max(1, paginationMeta.totalPages || Math.ceil(totalItems / rowsPerPage) || 1),
+		[paginationMeta.totalPages, rowsPerPage, totalItems]
+	);
+	const paginatedList = filteredList;
 
 	// ── Tab change ──
 	const handleTabChange = (_: SyntheticEvent, value: SalonTab) => {
+		setSearch('');
+		setPage(1);
 		const href = value === 'all' ? '/admin/salons' : `/admin/salons?tab=${value}`;
 		router.push(href, { scroll: false });
 	};
@@ -389,11 +542,13 @@ export default function AdminSalonsPage() {
 			if (!token) throw new Error('No access token found.');
 
 			await activateSalon(salonId, token);
-
-			// Optimistically update local state — no re-fetch needed
-			setAllSalons((prev) =>
-				prev.map((s) => (s.id === salonId ? { ...s, status: 'ACTIVE', isActive: true } : s))
-			);
+			const nextPage = page > 1 && allSalons.length === 1 ? page - 1 : page;
+			if (nextPage !== page) {
+				setPage(nextPage);
+			} else {
+				await loadPagedSalons(nextPage, activeTab);
+			}
+			void loadSummaryCounts();
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to approve salon.');
 		} finally {
@@ -410,10 +565,13 @@ export default function AdminSalonsPage() {
 			if (!token) throw new Error('No access token found.');
 
 			await rejectSalon(salonId, reason, token);
-
-			setAllSalons((prev) =>
-				prev.map((s) => (s.id === salonId ? { ...s, status: 'REJECTED' } : s))
-			);
+			const nextPage = page > 1 && allSalons.length === 1 ? page - 1 : page;
+			if (nextPage !== page) {
+				setPage(nextPage);
+			} else {
+				await loadPagedSalons(nextPage, activeTab);
+			}
+			void loadSummaryCounts();
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to reject salon.');
 		} finally {
@@ -430,10 +588,13 @@ export default function AdminSalonsPage() {
 			if (!token) throw new Error('No access token found.');
 
 			await suspendSalon(salonId, reason, token);
-
-			setAllSalons((prev) =>
-				prev.map((s) => (s.id === salonId ? { ...s, status: 'SUSPENDED', isActive: false } : s))
-			);
+			const nextPage = page > 1 && allSalons.length === 1 ? page - 1 : page;
+			if (nextPage !== page) {
+				setPage(nextPage);
+			} else {
+				await loadPagedSalons(nextPage, activeTab);
+			}
+			void loadSummaryCounts();
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to suspend salon.');
 		} finally {
@@ -450,10 +611,13 @@ export default function AdminSalonsPage() {
 			if (!token) throw new Error('No access token found.');
 
 			await unsuspendSalon(salonId, token);
-
-			setAllSalons((prev) =>
-				prev.map((s) => (s.id === salonId ? { ...s, status: 'ACTIVE', isActive: true } : s))
-			);
+			const nextPage = page > 1 && allSalons.length === 1 ? page - 1 : page;
+			if (nextPage !== page) {
+				setPage(nextPage);
+			} else {
+				await loadPagedSalons(nextPage, activeTab);
+			}
+			void loadSummaryCounts();
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to unsuspend salon.');
 		} finally {
@@ -775,7 +939,9 @@ export default function AdminSalonsPage() {
 											<Pagination
 												page={page}
 												count={totalPages}
-												onChange={(_, nextPage) => setPage(nextPage)}
+												onChange={(_, nextPage) =>
+													setPage(Math.min(Math.max(1, nextPage), totalPages))
+												}
 												color="primary"
 												shape="rounded"
 												sx={{ '& .Mui-selected': { backgroundColor: '#a78bfa !important', color: 'white' } }}

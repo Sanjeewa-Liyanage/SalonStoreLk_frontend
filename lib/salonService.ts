@@ -2,6 +2,22 @@
 import axios from "axios";
 import { refreshAccessToken } from "./authService";
 
+interface SalonQueryOptions {
+  page?: number;
+  limit?: number;
+}
+
+function buildSalonParams(
+  base: Record<string, string>,
+  options?: SalonQueryOptions
+) {
+  return {
+    ...base,
+    ...(typeof options?.page === "number" ? { page: String(options.page) } : {}),
+    ...(typeof options?.limit === "number" ? { limit: String(options.limit) } : {}),
+  };
+}
+
 async function salonRequest(params: Record<string, string>, accessToken: string) {
   const query = new URLSearchParams(params).toString();
   try {
@@ -44,9 +60,16 @@ async function salonPatchRequest(params: Record<string, string>, accessToken: st
   }
 }
 
-export const fetchAllSalons    = (token: string) => salonRequest({ type: "all" }, token);
-export const fetchActiveSalons = (token: string) => salonRequest({ type: "active" }, token);
-export const fetchPendingSalons = (token: string) => salonRequest({ type: "pending" }, token);
+export const fetchAllSalons = (token: string, options?: SalonQueryOptions) =>
+  salonRequest(buildSalonParams({ type: "all" }, options), token);
+export const fetchActiveSalons = (token: string, options?: SalonQueryOptions) =>
+  salonRequest(buildSalonParams({ type: "active" }, options), token);
+export const fetchPendingSalons = (token: string, options?: SalonQueryOptions) =>
+  salonRequest(buildSalonParams({ type: "pending" }, options), token);
+export const fetchSuspendedSalons = (token: string, options?: SalonQueryOptions) =>
+  salonRequest(buildSalonParams({ type: "suspended" }, options), token);
+export const fetchRejectedSalons = (token: string, options?: SalonQueryOptions) =>
+  salonRequest(buildSalonParams({ type: "rejected" }, options), token);
 export const fetchSalonById    = (id: string, token: string) => salonRequest({ type: "by-id", id }, token);
 export const fetchByOwner      = (token: string) => salonRequest({ type: "by-owner" }, token);
 

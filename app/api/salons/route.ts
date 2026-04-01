@@ -4,11 +4,11 @@ import apiClient from "@/lib/axios";
 
 const SALON_ENDPOINTS: Record<string, string> = {
   all: "/salon/all",
-  active: "/salon/active",
-  pending:"/salon/pending",
   "by-id": "/salon",   // will append /:id below
   "by-owner": "/salon/owner",
 };
+
+const FILTER_TYPES = new Set(["active", "pending", "suspended", "rejected"]);
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,15 +18,26 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const type = searchParams.get("type") ?? "all";
     const id = searchParams.get("id");
+    const page = searchParams.get("page");
+    const limit = searchParams.get("limit");
 
-    const basePath = SALON_ENDPOINTS[type];
+    const normalizedType = FILTER_TYPES.has(type) ? "all" : type;
+    const basePath = SALON_ENDPOINTS[normalizedType];
     if (!basePath) {
       return NextResponse.json({ message: "Invalid salon type" }, { status: 400 });
     }
 
     const endpoint = type === "by-id" && id ? `${basePath}/${id}` : basePath;
+    const upstreamQuery = new URLSearchParams();
+    if (page) upstreamQuery.set("page", page);
+    if (limit) upstreamQuery.set("limit", limit);
+    if (FILTER_TYPES.has(type)) upstreamQuery.set("type", type);
 
-    const { data } = await apiClient.get(endpoint, { headers });
+    const endpointWithQuery = upstreamQuery.toString()
+      ? `${endpoint}?${upstreamQuery.toString()}`
+      : endpoint;
+
+    const { data } = await apiClient.get(endpointWithQuery, { headers });
     return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
     const status = error?.response?.status || 500;
