@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AuthGuard from "@/components/AuthGuard";
-import { useAuth } from "@/context/AuthContext";
+import { useAppSelector } from "@/lib/store/hooks";
 import AddSalonDialog from "@/components/AddSalonDialog";
 import { getStoredSalonId, setStoredSalonId } from "@/lib/salonSelection";
 
@@ -30,7 +30,7 @@ export default function SalonDashboard() {
   const [currentSalonId, setCurrentSalonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { user } = useAuth();
+  const user = useAppSelector((state) => state.auth.user);
 
   // Fetch salons function
   const loadSalons = async () => {

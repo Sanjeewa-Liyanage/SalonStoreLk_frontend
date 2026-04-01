@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Image from 'next/image';
-import { loginUser, getUserProfile } from "@/lib/authService";
+import { loginUser } from "@/lib/authService";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,8 +14,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
-
-    const router = useRouter();
+  const { login } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
      e.preventDefault();
@@ -23,24 +25,16 @@ export default function LoginPage() {
     try {
       const data = await loginUser(email, password);
 
-      // Store tokens from backend response
-      sessionStorage.setItem("accessToken", data.backendTokens.accessToken);
-      sessionStorage.setItem("refreshToken", data.backendTokens.refreshToken);
+      // Use the centralized login helper from AuthContext
+      await login(data.backendTokens.accessToken, data.backendTokens.refreshToken);
 
-      // Fetch full user profile using the access token
-      const userProfile = await getUserProfile();
-      sessionStorage.setItem("user", JSON.stringify(userProfile));
-      console.log("User profile after login:", userProfile);
-      if(userProfile.role === "ADMIN" && userProfile.adminLevel==="SUPER") {
+      // Redirect based on role
+      const userProfile = JSON.parse(sessionStorage.getItem("user") || "{}");
+      if (userProfile.role === "ADMIN" && userProfile.adminLevel === "SUPER") {
         router.push("/admin/dashboard");
-        
-        return;
-      }else if(userProfile.role === "SALON_OWNER"){
+      } else if (userProfile.role === "SALON_OWNER") {
         router.push("/salon_owner/dashboard");
       }
-      
-      
-
     } catch (err: any) {
       alert(err?.response?.data?.message || "Login failed. Please try again.");
       setError(err?.response?.data?.message || "Invalid email or password");

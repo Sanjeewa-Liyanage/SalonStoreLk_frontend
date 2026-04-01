@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 //@ts-ignore
- import "./globals.css";
+import "./globals.css";
 import { MuiThemeProvider } from "@/context/MuiThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
+import StoreProvider from "@/lib/store/StoreProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,11 +31,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <MuiThemeProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-        </MuiThemeProvider>
+        <StoreProvider>
+          <MuiThemeProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </MuiThemeProvider>
+        </StoreProvider>
       </body>
     </html>
   );

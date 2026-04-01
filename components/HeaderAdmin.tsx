@@ -33,6 +33,8 @@ import {
   Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useMuiTheme } from '@/context/MuiThemeContext';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 const NOTIFICATIONS = [
   {
@@ -87,6 +89,9 @@ export default function HeaderAdmin({
   pageSubtitle = "Welcome back — here's what's happening today.",
 }: HeaderProps) {
   const { isDark, toggleTheme } = useMuiTheme();
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
   const [search, setSearch] = useState('');
   const [notifAnchor, setNotifAnchor] = useState<null | HTMLElement>(null);
   const [userAnchor, setUserAnchor] = useState<null | HTMLElement>(null);
@@ -111,12 +116,29 @@ export default function HeaderAdmin({
     setUserAnchor(null);
   };
 
+  const handleLogout = () => {
+    handleUserClose();
+    logout();
+    router.push('/auth/login');
+  };
+
   const markAllRead = () => {
     setNotifications((n) => n.map((x) => ({ ...x, unread: false })));
   };
 
   const filteredNotifications =
     notifFilter === 'unread' ? notifications.filter((n) => n.unread) : notifications;
+
+  const displayName = user?.name || user?.firstName || user?.lastName
+    ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Admin User'
+    : 'Admin User';
+  const displayEmail = user?.email || 'admin@salonstore.lk';
+  const initials = displayName
+    ? displayName.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() || 'AD'
+    : 'AD';
+  
+  // Use user avatar if available
+  const avatarSrc = user?.avatarUrl || '';
 
   return (
     <>
@@ -245,6 +267,7 @@ export default function HeaderAdmin({
               }}
             >
               <Avatar
+                src={avatarSrc}
                 sx={{
                   width: 32,
                   height: 32,
@@ -253,7 +276,7 @@ export default function HeaderAdmin({
                   fontWeight: 700,
                 }}
               >
-                GB
+                {!avatarSrc && initials}
               </Avatar>
             </IconButton>
           </Stack>
@@ -379,8 +402,8 @@ export default function HeaderAdmin({
                           ? '#f1f5f9'
                           : '#1a1d2e'
                         : isDark
-                        ? '#6b7a99'
-                        : '#94a3b8',
+                          ? '#6b7a99'
+                          : '#94a3b8',
                     }}
                     secondaryTypographyProps={{
                       variant: 'caption',
@@ -439,6 +462,7 @@ export default function HeaderAdmin({
         <Box sx={{ px: 2, py: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar
+              src={avatarSrc}
               sx={{
                 width: 36,
                 height: 36,
@@ -447,14 +471,14 @@ export default function HeaderAdmin({
                 fontWeight: 700,
               }}
             >
-              GB
+              {!avatarSrc && initials}
             </Avatar>
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Admin User
+                {displayName}
               </Typography>
               <Typography variant="caption" sx={{ color: isDark ? '#6b7a99' : '#94a3b8' }}>
-                admin@salonstore.lk
+                {displayEmail}
               </Typography>
             </Box>
           </Stack>
@@ -495,7 +519,7 @@ export default function HeaderAdmin({
         <Divider sx={{ my: 1 }} />
 
         <MenuItem
-          onClick={handleUserClose}
+          onClick={handleLogout}
           sx={{
             py: 1.5,
             px: 2,
