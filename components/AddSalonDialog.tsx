@@ -22,6 +22,15 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [salonName, setSalonName] = useState("");
+  const [openingTime, setOpeningTime] = useState("09:00");
+  const [closingTime, setClosingTime] = useState("19:00");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [socialMedia, setSocialMedia] = useState({
+    facebook: "",
+    instagram: "",
+    tiktok: "",
+    youtube: "",
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addService = () => setServices([...services, { name: "", price: "", duration: "" }]);
@@ -29,6 +38,13 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
   const removeService = (index: number) => {
     const newServices = services.filter((_, i) => i !== index);
     setServices(newServices);
+  };
+
+  const handleSocialMediaChange = (platform: string, value: string) => {
+    setSocialMedia(prev => ({
+      ...prev,
+      [platform]: value
+    }));
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +89,7 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     const salonNameValue = formData.get("salonName") as string;
+    const phoneNumber = formData.get("phoneNumber") as string;
     
     try {
       // Generate a salonCode (could be more sophisticated)
@@ -83,19 +100,30 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
       
       const payload = {
         salonName: salonNameValue,
-        description: formData.get("description"),
-        address: formData.get("address"),
-        city: formData.get("city"),
-        phoneNumber: formData.get("phoneNumber"),
+        overview: formData.get("overview") as string,
+        description: formData.get("description") as string,
+        address: formData.get("address") as string,
+        city: formData.get("city") as string,
+        phoneNumber: phoneNumber,
+        contactInfo: {
+          phoneNumber: phoneNumber,
+          whatsappNumber: whatsappNumber
+        },
         isActive: true,
-        openingTime: new Date().toISOString(),
-        closingTime: new Date().toISOString(),
+        openingTime: openingTime,
+        closingTime: closingTime,
         images: imageUrls.length > 0 ? imageUrls : ["https://placehold.co/600x400"],
         services: services.map(s => ({
           name: s.name,
           price: Number(s.price),
           duration: Number(s.duration)
-        }))
+        })),
+        socialMediaLinks: {
+          facebook: socialMedia.facebook || undefined,
+          instagram: socialMedia.instagram || undefined,
+          tiktok: socialMedia.tiktok || undefined,
+          youtube: socialMedia.youtube || undefined,
+        }
       };
 
       await createSalon(payload);
@@ -105,6 +133,11 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
       setImageFiles([]);
       setImagePreviews([]);
       setSalonName("");
+      setOpeningTime("09:00");
+      setClosingTime("19:00");
+      setWhatsappNumber("");
+      setSocialMedia({ facebook: "", instagram: "", tiktok: "", youtube: "" });
+      setServices([{ name: "", price: "", duration: "" }]);
       
       onSuccess?.();
       onOpenChange(false);
@@ -117,41 +150,123 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[92vw] max-w-[92vw] sm:max-w-5xl max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <DialogHeader>
           <DialogTitle className="font-playfair text-2xl">Register Your Salon</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          {/* Basic Information */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Salon Name</label>
+              <label className="text-sm font-medium">Salon Name *</label>
               <Input name="salonName" required placeholder="Elegant Hair Studio" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">City</label>
+              <label className="text-sm font-medium">City *</label>
               <Input name="city" required placeholder="Colombo" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
-            <Textarea name="description" required placeholder="Describe your services..." />
+            <label className="text-sm font-medium">Overview *</label>
+            <Input name="overview" required placeholder="Premium beauty and wellness services..." />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description *</label>
+            <Textarea name="description" required placeholder="We specialize in hair, skin, nails, and bridal styling..." className="min-h-24" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Address</label>
-              <Input name="address" required placeholder="123 Main Street" />
+              <label className="text-sm font-medium">Address *</label>
+              <Input name="address" required placeholder="No 145, Main Street" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Phone Number</label>
-              <Input name="phoneNumber" required placeholder="+9477..." />
+              <label className="text-sm font-medium">Phone Number *</label>
+              <Input name="phoneNumber" required placeholder="+94771234567" />
             </div>
           </div>
 
-          <div className="space-y-4">
+          {/* Contact Information */}
+          <div className="p-4 rounded-lg space-y-3 border border-white/20">
+            <h3 className="font-semibold text-white text-sm">Contact Information</h3>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">WhatsApp Number</label>
+              <Input 
+                placeholder="+94775550011" 
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Operating Hours */}
+          <div className="p-4 rounded-lg space-y-3 border border-white/20">
+            <h3 className="font-semibold text-white text-sm">Operating Hours</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Opening Time</label>
+                <Input 
+                  type="time"
+                  value={openingTime}
+                  onChange={(e) => setOpeningTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Closing Time</label>
+                <Input 
+                  type="time"
+                  value={closingTime}
+                  onChange={(e) => setClosingTime(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Social Media Links */}
+          <div className="p-4 rounded-lg space-y-3 border border-white/20">
+            <h3 className="font-semibold text-white text-sm">Social Media Links</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Facebook</label>
+                <Input 
+                  placeholder="https://facebook.com/yourpage"
+                  value={socialMedia.facebook}
+                  onChange={(e) => handleSocialMediaChange('facebook', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Instagram</label>
+                <Input 
+                  placeholder="https://instagram.com/yourprofile"
+                  value={socialMedia.instagram}
+                  onChange={(e) => handleSocialMediaChange('instagram', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">TikTok</label>
+                <Input 
+                  placeholder="https://tiktok.com/@yourprofile"
+                  value={socialMedia.tiktok}
+                  onChange={(e) => handleSocialMediaChange('tiktok', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">YouTube</label>
+                <Input 
+                  placeholder="https://youtube.com/@yourchannel"
+                  value={socialMedia.youtube}
+                  onChange={(e) => handleSocialMediaChange('youtube', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Services */}
+          <div className="space-y-4 p-4 rounded-lg border border-white/20">
             <div className="flex justify-between items-center">
-              <h3 className="font-semibold text-neutral-700">Services</h3>
+              <h3 className="font-semibold text-white">Services</h3>
               <Button type="button" variant="outline" size="sm" onClick={addService}>
                 <Plus className="w-4 h-4 mr-2" /> Add Service
               </Button>
@@ -160,7 +275,7 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
               <div key={index} className="flex gap-3 items-end border-b pb-4">
                 <div className="flex-1 space-y-1">
                   <Input 
-                    placeholder="Name" 
+                    placeholder="Service name (e.g., Hair Cut)" 
                     value={service.name}
                     onChange={(e) => {
                       const s = [...services];
@@ -169,7 +284,7 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
                     }}
                   />
                 </div>
-                <div className="w-24 space-y-1">
+                <div className="w-28 space-y-1">
                   <Input 
                     placeholder="Price" 
                     type="number"
@@ -183,7 +298,7 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
                 </div>
                 <div className="w-24 space-y-1">
                   <Input 
-                    placeholder="Min" 
+                    placeholder="Duration (min)" 
                     type="number"
                     value={service.duration}
                     onChange={(e) => {
@@ -206,9 +321,10 @@ export default function AddSalonDialog({ open, onOpenChange, onSuccess }: any) {
             ))}
           </div>
 
-          <div className="space-y-4">
+          {/* Images */}
+          <div className="space-y-4 p-4 rounded-lg border border-white/20">
             <div className="flex justify-between items-center">
-              <h3 className="font-semibold text-neutral-700">Images</h3>
+              <h3 className="font-semibold text-white">Images</h3>
               <div>
                 <input
                   ref={fileInputRef}

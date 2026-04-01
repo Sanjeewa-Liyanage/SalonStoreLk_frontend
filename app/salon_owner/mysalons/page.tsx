@@ -49,22 +49,38 @@ type Salon = {
 
 type SalonFormValues = {
 	salonName: string;
+	overview: string;
 	description: string;
 	address: string;
 	city: string;
 	phoneNumber: string;
+	whatsappNumber: string;
 	openingTime: string;
 	closingTime: string;
+	socialMedia: {
+		facebook?: string;
+		instagram?: string;
+		tiktok?: string;
+		youtube?: string;
+	};
 };
 
 const EMPTY_FORM: SalonFormValues = {
 	salonName: "",
+	overview: "",
 	description: "",
 	address: "",
 	city: "",
 	phoneNumber: "",
+	whatsappNumber: "",
 	openingTime: "",
 	closingTime: "",
+	socialMedia: {
+		facebook: "",
+		instagram: "",
+		tiktok: "",
+		youtube: "",
+	},
 };
 
 const FORM_FIELD_CLASS = "bg-white text-gray-900 placeholder:text-gray-400 border-gray-300";
@@ -161,14 +177,25 @@ export default function MySalonsPage() {
 			return;
 		}
 
+		const contactInfo = (selectedSalon as any)?.contactInfo || {};
+		const socialMediaLinks = (selectedSalon as any)?.socialMediaLinks || {};
+
 		setFormValues({
 			salonName: selectedSalon.salonName || selectedSalon.name || "",
+			overview: (selectedSalon as any)?.overview || "",
 			description: selectedSalon.description || "",
 			address: selectedSalon.address || "",
 			city: selectedSalon.city || "",
 			phoneNumber: selectedSalon.phoneNumber || "",
+			whatsappNumber: contactInfo?.whatsappNumber || "",
 			openingTime: selectedSalon.openingTime || "",
 			closingTime: selectedSalon.closingTime || "",
+			socialMedia: {
+				facebook: socialMediaLinks?.facebook || "",
+				instagram: socialMediaLinks?.instagram || "",
+				tiktok: socialMediaLinks?.tiktok || "",
+				youtube: socialMediaLinks?.youtube || "",
+			},
 		});
 	}, [selectedSalon]);
 
@@ -201,16 +228,26 @@ export default function MySalonsPage() {
 
 			const payload = {
 				salonName: formValues.salonName.trim(),
+				overview: formValues.overview.trim(),
 				description: formValues.description.trim(),
 				address: formValues.address.trim(),
 				city: formValues.city.trim(),
 				phoneNumber: formValues.phoneNumber.trim(),
+				contactInfo: {
+					phoneNumber: formValues.phoneNumber.trim(),
+					whatsappNumber: formValues.whatsappNumber.trim(),
+				},
 				openingTime: formValues.openingTime,
 				closingTime: formValues.closingTime,
 				services: selectedSalon?.services || [],
 				images: selectedSalon?.images || [],
+				socialMediaLinks: {
+					facebook: formValues.socialMedia.facebook?.trim() || undefined,
+					instagram: formValues.socialMedia.instagram?.trim() || undefined,
+					tiktok: formValues.socialMedia.tiktok?.trim() || undefined,
+					youtube: formValues.socialMedia.youtube?.trim() || undefined,
+				},
 			};
-
 			await updateSalon(selectedSalonId, payload, accessToken);
 			toast.success("Salon details updated successfully.");
 			await loadOwnerSalons(selectedSalonId);
@@ -336,7 +373,7 @@ export default function MySalonsPage() {
 											<form onSubmit={handleUpdateSalon} className="space-y-5">
 												<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 													<div className="space-y-2">
-														<label className="text-sm font-medium text-gray-700">Salon Name</label>
+														<label className="text-sm font-medium text-gray-700">Salon Name *</label>
 														<Input
 															value={formValues.salonName}
 															onChange={(event) => handleFieldChange("salonName", event.target.value)}
@@ -346,7 +383,7 @@ export default function MySalonsPage() {
 														/>
 													</div>
 													<div className="space-y-2">
-														<label className="text-sm font-medium text-gray-700">City</label>
+														<label className="text-sm font-medium text-gray-700">City *</label>
 														<Input
 															value={formValues.city}
 															onChange={(event) => handleFieldChange("city", event.target.value)}
@@ -358,11 +395,21 @@ export default function MySalonsPage() {
 												</div>
 
 												<div className="space-y-2">
+													<label className="text-sm font-medium text-gray-700">Overview</label>
+													<Input
+														value={formValues.overview}
+														onChange={(event) => handleFieldChange("overview", event.target.value)}
+														placeholder="Premium beauty and wellness services..."
+														className={FORM_FIELD_CLASS}
+													/>
+												</div>
+
+												<div className="space-y-2">
 													<label className="text-sm font-medium text-gray-700">Description</label>
 													<Textarea
 														value={formValues.description}
 														onChange={(event) => handleFieldChange("description", event.target.value)}
-														placeholder="Describe your salon"
+														placeholder="Describe your salon services..."
 														className={FORM_FIELD_CLASS}
 														rows={4}
 													/>
@@ -409,6 +456,85 @@ export default function MySalonsPage() {
 															placeholder="Closing time"
 															className={FORM_FIELD_CLASS}
 														/>
+													</div>
+												</div>
+
+												{/* Contact Information Section */}
+												<div className="bg-blue-50 p-4 rounded-lg">
+													<h4 className="text-sm font-semibold text-gray-900 mb-3">Contact Information</h4>
+													<div className="space-y-2">
+														<label className="text-sm font-medium text-gray-700">WhatsApp Number</label>
+														<Input
+															value={formValues.whatsappNumber}
+															onChange={(event) => {
+																setFormValues(prev => ({...prev, whatsappNumber: event.target.value}));
+															}}
+															placeholder="+94775550011"
+															className={FORM_FIELD_CLASS}
+														/>
+													</div>
+												</div>
+
+												{/* Social Media Links Section */}
+												<div className="bg-purple-50 p-4 rounded-lg">
+													<h4 className="text-sm font-semibold text-gray-900 mb-3">Social Media Links</h4>
+													<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+														<div className="space-y-2">
+															<label className="text-sm font-medium text-gray-700">Facebook</label>
+															<Input
+																value={formValues.socialMedia.facebook || ""}
+																onChange={(event) => {
+																	setFormValues(prev => ({
+																		...prev,
+																		socialMedia: {...prev.socialMedia, facebook: event.target.value}
+																	}));
+																}}
+																placeholder="https://facebook.com/yourpage"
+																className={FORM_FIELD_CLASS}
+															/>
+														</div>
+														<div className="space-y-2">
+															<label className="text-sm font-medium text-gray-700">Instagram</label>
+															<Input
+																value={formValues.socialMedia.instagram || ""}
+																onChange={(event) => {
+																	setFormValues(prev => ({
+																		...prev,
+																		socialMedia: {...prev.socialMedia, instagram: event.target.value}
+																	}));
+																}}
+																placeholder="https://instagram.com/yourprofile"
+																className={FORM_FIELD_CLASS}
+															/>
+														</div>
+														<div className="space-y-2">
+															<label className="text-sm font-medium text-gray-700">TikTok</label>
+															<Input
+																value={formValues.socialMedia.tiktok || ""}
+																onChange={(event) => {
+																	setFormValues(prev => ({
+																		...prev,
+																		socialMedia: {...prev.socialMedia, tiktok: event.target.value}
+																	}));
+																}}
+																placeholder="https://tiktok.com/@yourprofile"
+																className={FORM_FIELD_CLASS}
+															/>
+														</div>
+														<div className="space-y-2">
+															<label className="text-sm font-medium text-gray-700">YouTube</label>
+															<Input
+																value={formValues.socialMedia.youtube || ""}
+																onChange={(event) => {
+																	setFormValues(prev => ({
+																		...prev,
+																		socialMedia: {...prev.socialMedia, youtube: event.target.value}
+																	}));
+																}}
+																placeholder="https://youtube.com/@yourchannel"
+																className={FORM_FIELD_CLASS}
+															/>
+														</div>
 													</div>
 												</div>
 

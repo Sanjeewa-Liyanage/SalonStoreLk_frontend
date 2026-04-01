@@ -22,6 +22,35 @@ export interface Salon {
     facebook?: string;
     instagram?: string;
     tiktok?: string;
+    youtube?: string;
+  };
+}
+
+export interface SalonCreatePayload {
+  salonName: string;
+  overview: string;
+  description: string;
+  address: string;
+  city: string;
+  phoneNumber: string;
+  contactInfo: {
+    phoneNumber: string;
+    whatsappNumber: string;
+  };
+  isActive: boolean;
+  openingTime: string;
+  closingTime: string;
+  services: Array<{
+    name: string;
+    price: number;
+    duration: number;
+  }>;
+  images: string[];
+  socialMediaLinks: {
+    facebook?: string;
+    instagram?: string;
+    tiktok?: string;
+    youtube?: string;
   };
 }
 

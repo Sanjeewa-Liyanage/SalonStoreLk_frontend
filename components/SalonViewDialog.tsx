@@ -13,12 +13,15 @@ import {
 	IconButton,
 	Card,
 	CardContent,
+	Link,
 } from '@mui/material';
 import {
 	Close as CloseIcon,
 	Phone as PhoneIcon,
 	LocationOn as LocationOnIcon,
 	AccessTime as AccessTimeIcon,
+	WhatsApp as WhatsAppIcon,
+	Language as LanguageIcon,
 } from '@mui/icons-material';
 import { useMuiTheme } from '@/context/MuiThemeContext';
 import Loader from './Loader';
@@ -43,6 +46,7 @@ interface SalonDetail {
 	id: string;
 	salonCode: string;
 	salonName: string;
+	overview?: string;
 	description: string;
 	address: string;
 	city: string;
@@ -57,6 +61,16 @@ interface SalonDetail {
 	images?: string[];
 	openingTime?: string;
 	closingTime?: string;
+	contactInfo?: {
+		phoneNumber?: string;
+		whatsappNumber?: string;
+	};
+	socialMediaLinks?: {
+		facebook?: string;
+		instagram?: string;
+		tiktok?: string;
+		youtube?: string;
+	};
 }
 
 interface SalonViewDialogProps {
@@ -390,6 +404,86 @@ export default function SalonViewDialog({
 							</Typography>
 						</Box>
 
+						{/* Overview */}
+						{salon.overview && (
+							<Box sx={{ marginBottom: 2 }}>
+								<Typography
+									variant="caption"
+									sx={{
+										color: isDark ? '#94a3b8' : '#64748b',
+										textTransform: 'uppercase',
+										fontSize: '0.75rem',
+										fontWeight: 500,
+										letterSpacing: '0.5px',
+									}}
+								>
+									Overview
+								</Typography>
+								<Typography
+									sx={{
+										color: isDark ? '#e2e8f0' : '#1e293b',
+										marginTop: 0.5,
+										wordBreak: 'break-word',
+									}}
+								>
+									{salon.overview}
+								</Typography>
+							</Box>
+						)}
+
+						{/* Contact Information */}
+						{salon.contactInfo && (
+							<Box sx={{ marginBottom: 2, backgroundColor: isDark ? '#1a202c' : '#f0f4f8', padding: 2, borderRadius: 1 }}>
+								<Typography
+									variant="caption"
+									sx={{
+										color: isDark ? '#94a3b8' : '#64748b',
+										textTransform: 'uppercase',
+										fontSize: '0.75rem',
+										fontWeight: 500,
+										letterSpacing: '0.5px',
+										display: 'block',
+										marginBottom: 1,
+									}}
+								>
+									Contact Information
+								</Typography>
+								<Stack spacing={1}>
+									{salon.contactInfo.phoneNumber && (
+										<Stack direction="row" spacing={1} alignItems="center">
+											<PhoneIcon sx={{ fontSize: '0.85rem', color: isDark ? '#94a3b8' : '#64748b' }} />
+											<Box>
+												<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', fontSize: '0.7rem' }}>
+													Main Phone
+												</Typography>
+												<Typography sx={{ color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '0.875rem' }}>
+													{salon.contactInfo.phoneNumber}
+												</Typography>
+											</Box>
+										</Stack>
+									)}
+									{salon.contactInfo.whatsappNumber && (
+										<Stack direction="row" spacing={1} alignItems="center">
+											<WhatsAppIcon sx={{ fontSize: '0.85rem', color: '#25D366' }} />
+											<Box>
+												<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', fontSize: '0.7rem' }}>
+													WhatsApp
+												</Typography>
+												<Link
+													href={`https://wa.me/${salon.contactInfo.whatsappNumber.replace(/\D/g, '')}`}
+													target="_blank"
+													rel="noopener noreferrer"
+													sx={{ color: '#25D366', fontSize: '0.875rem', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+												>
+													{salon.contactInfo.whatsappNumber}
+												</Link>
+											</Box>
+										</Stack>
+									)}
+								</Stack>
+							</Box>
+						)}
+
 						{/* Services */}
 						{salon.services && salon.services.length > 0 && (
 							<Box sx={{ marginBottom: 2 }}>
@@ -446,6 +540,112 @@ export default function SalonViewDialog({
 											</CardContent>
 										</Card>
 									))}
+								</Stack>
+							</Box>
+						)}
+
+						{/* Social Media Links */}
+						{salon.socialMediaLinks && Object.values(salon.socialMediaLinks).some(link => link) && (
+							<Box sx={{ marginBottom: 2, backgroundColor: isDark ? '#1a202c' : '#f0f4f8', padding: 2, borderRadius: 1 }}>
+								<Typography
+									variant="caption"
+									sx={{
+										color: isDark ? '#94a3b8' : '#64748b',
+										textTransform: 'uppercase',
+										fontSize: '0.75rem',
+										fontWeight: 500,
+										letterSpacing: '0.5px',
+										display: 'block',
+										marginBottom: 1,
+									}}
+								>
+									Follow Us
+								</Typography>
+								<Stack direction="row" spacing={1} flexWrap="wrap">
+									{salon.socialMediaLinks.facebook && (
+										<Link
+											href={salon.socialMediaLinks.facebook}
+											target="_blank"
+											rel="noopener noreferrer"
+											sx={{
+												display: 'inline-flex',
+												alignItems: 'center',
+												gap: 0.5,
+												padding: '6px 12px',
+												backgroundColor: isDark ? '#263238' : '#e3f2fd',
+												borderRadius: '6px',
+												textDecoration: 'none',
+												fontSize: '0.75rem',
+												color: '#1976d2',
+												'&:hover': { backgroundColor: isDark ? '#37474f' : '#bbdefb' },
+											}}
+										>
+											<LanguageIcon sx={{ fontSize: '0.9rem' }} /> Facebook
+										</Link>
+									)}
+									{salon.socialMediaLinks.instagram && (
+										<Link
+											href={salon.socialMediaLinks.instagram}
+											target="_blank"
+											rel="noopener noreferrer"
+											sx={{
+												display: 'inline-flex',
+												alignItems: 'center',
+												gap: 0.5,
+												padding: '6px 12px',
+												backgroundColor: isDark ? '#263238' : '#f3e5f5',
+												borderRadius: '6px',
+												textDecoration: 'none',
+												fontSize: '0.75rem',
+												color: '#e91e63',
+												'&:hover': { backgroundColor: isDark ? '#37474f' : '#f1f0f2' },
+											}}
+										>
+											<LanguageIcon sx={{ fontSize: '0.9rem' }} /> Instagram
+										</Link>
+									)}
+									{salon.socialMediaLinks.tiktok && (
+										<Link
+											href={salon.socialMediaLinks.tiktok}
+											target="_blank"
+											rel="noopener noreferrer"
+											sx={{
+												display: 'inline-flex',
+												alignItems: 'center',
+												gap: 0.5,
+												padding: '6px 12px',
+												backgroundColor: isDark ? '#263238' : '#f5f5f5',
+												borderRadius: '6px',
+												textDecoration: 'none',
+												fontSize: '0.75rem',
+												color: '#000',
+												'&:hover': { backgroundColor: isDark ? '#37474f' : '#eeeeee' },
+											}}
+										>
+											<LanguageIcon sx={{ fontSize: '0.9rem' }} /> TikTok
+										</Link>
+									)}
+									{salon.socialMediaLinks.youtube && (
+										<Link
+											href={salon.socialMediaLinks.youtube}
+											target="_blank"
+											rel="noopener noreferrer"
+											sx={{
+												display: 'inline-flex',
+												alignItems: 'center',
+												gap: 0.5,
+												padding: '6px 12px',
+												backgroundColor: isDark ? '#263238' : '#ffebee',
+												borderRadius: '6px',
+												textDecoration: 'none',
+												fontSize: '0.75rem',
+												color: '#ff0000',
+												'&:hover': { backgroundColor: isDark ? '#37474f' : '#ffcdd2' },
+											}}
+										>
+											<LanguageIcon sx={{ fontSize: '0.9rem' }} /> YouTube
+										</Link>
+									)}
 								</Stack>
 							</Box>
 						)}
