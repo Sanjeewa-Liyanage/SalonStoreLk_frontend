@@ -30,6 +30,8 @@ import {
   AdsClick as AdsClickIcon,
 } from '@mui/icons-material';
 import { useMuiTheme } from '@/context/MuiThemeContext';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 const MENU_ITEMS = [
@@ -73,7 +75,7 @@ const MENU_ITEMS = [
     ]
   },
   {
-    label: 'Ads planS',
+    label: 'Ads Plans',
     icon: AnalyticsIcon,
     href: '/admin/adsplans',
 
@@ -88,9 +90,34 @@ const MENU_ITEMS = [
 export default function Sidebar() {
   const theme = useTheme();
   const { isDark } = useMuiTheme();
+  const { logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Salons', 'Users']);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  // Construct full current path
+  const currentPath = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
+
+  // Automatically expand the parent if a child is active
+  React.useEffect(() => {
+    MENU_ITEMS.forEach(item => {
+      if (item.children) {
+        const isChildActive = item.children.some(child => currentPath === child.href);
+        if (isChildActive && !expandedItems.includes(item.label)) {
+          setExpandedItems(prev => [...prev, item.label]);
+        }
+      }
+    });
+  }, [currentPath]);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
+  };
 
   const toggleExpand = (label: string) => {
     setExpandedItems((prev) =>
@@ -161,7 +188,9 @@ export default function Sidebar() {
               onClick={() => item.children && toggleExpand(item.label)}
               href={!item.children ? item.href : undefined}
               component={!item.children ? Link : 'button'}
+              selected={currentPath === item.href || (item.children && item.children.some(child => currentPath === child.href))}
               sx={{
+                width: '100%',
                 borderRadius: '8px',
                 mb: 0.5,
                 color: isDark ? '#e2e8f0' : '#1a1d2e',
@@ -173,6 +202,9 @@ export default function Sidebar() {
                   color: '#a78bfa',
                   '& .MuiListItemIcon-root': {
                     color: '#a78bfa',
+                  },
+                  '&:hover': {
+                    backgroundColor: isDark ? 'rgba(167, 139, 250, 0.2)' : '#ddd6fe',
                   },
                 },
               }}
@@ -206,7 +238,9 @@ export default function Sidebar() {
                       key={child.label}
                       href={child.href}
                       component={Link}
+                      selected={currentPath === child.href}
                       sx={{
+                        width: '100%',
                         pl: 6,
                         borderRadius: '6px',
                         mb: 0.3,
@@ -215,6 +249,17 @@ export default function Sidebar() {
                         '&:hover': {
                           backgroundColor: isDark ? 'rgba(167, 139, 250, 0.08)' : '#f9f5ff',
                         },
+                        '&.Mui-selected': {
+                          backgroundColor: isDark ? 'rgba(167, 139, 250, 0.1)' : '#f5f3ff',
+                          color: '#a78bfa',
+                          fontWeight: 600,
+                          '&:hover': {
+                            backgroundColor: isDark ? 'rgba(167, 139, 250, 0.15)' : '#ede9fe',
+                          },
+                        },
+                        '& .MuiListItemText-primary': {
+                          fontSize: '0.875rem',
+                        }
                       }}
                     >
                       <ListItemText
@@ -246,12 +291,13 @@ export default function Sidebar() {
           }}
         />
         <ListItemButton
+          onClick={handleLogout}
           sx={{
             borderRadius: '8px',
             color: '#ef4444',
             '&:hover': {
               backgroundColor: isDark ? 'rgba(239, 68, 68, 0.08)' : '#fff1f2',
-          },
+            },
           }}
         >
           <ListItemIcon sx={{ minWidth: 40, color: '#ef4444' }}>

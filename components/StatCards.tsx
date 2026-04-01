@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, Box, Typography, Stack, LinearProgress } from '@mui/material';
+import Link from 'next/link';
+import { Card, CardContent, Box, Typography, Stack, Button } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   People as PeopleIcon,
@@ -14,22 +15,22 @@ interface StatCardProps {
   title: string;
   value: string | number;
   icon: React.ComponentType<any>;
-  trend?: number;
   color: string;
   bgColor: string;
-  description?: string;
-  progress?: number;
+  helperText: string;
+  actionLabel: string;
+  actionHref: string;
 }
 
 function StatCard({
   title,
   value,
   icon: Icon,
-  trend,
   color,
   bgColor,
-  description,
-  progress,
+  helperText,
+  actionLabel,
+  actionHref,
 }: StatCardProps) {
   const { isDark } = useMuiTheme();
 
@@ -50,7 +51,7 @@ function StatCard({
       }}
     >
       <CardContent>
-        <Stack spacing={2}>
+        <Stack spacing={2.5}>
           {/* Header */}
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
             <Box>
@@ -58,7 +59,8 @@ function StatCard({
                 variant="body2"
                 sx={{
                   color: isDark ? '#6b7a99' : '#94a3b8',
-                  fontWeight: 500,
+                  fontWeight: 600,
+                  letterSpacing: 0.2,
                   mb: 0.5,
                 }}
               >
@@ -67,7 +69,7 @@ function StatCard({
               <Typography
                 variant="h5"
                 sx={{
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: isDark ? '#f1f5f9' : '#1a1d2e',
                 }}
               >
@@ -89,111 +91,90 @@ function StatCard({
             </Box>
           </Stack>
 
-          {/* Trend */}
-          {trend !== undefined && (
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <TrendingUpIcon
-                sx={{
-                  fontSize: '1rem',
-                  color: trend >= 0 ? '#10b981' : '#ef4444',
-                }}
-              />
-              <Typography
-                variant="caption"
-                sx={{
-                  color: trend >= 0 ? '#10b981' : '#ef4444',
-                  fontWeight: 600,
-                }}
-              >
-                {trend >= 0 ? '+' : ''}{trend}% from last month
-              </Typography>
-            </Stack>
-          )}
-
-          {/* Progress */}
-          {progress !== undefined && (
-            <Box>
-              <Stack direction="row" justifyContent="space-between" mb={1}>
-                <Typography variant="caption" sx={{ color: isDark ? '#6b7a99' : '#94a3b8' }}>
-                  {description}
-                </Typography>
-                <Typography variant="caption" sx={{ fontWeight: 600, color }}>
-                  {progress}%
-                </Typography>
-              </Stack>
-              <LinearProgress
-                variant="determinate"
-                value={progress}
-                sx={{
-                  height: 6,
-                  borderRadius: '3px',
-                  backgroundColor: isDark ? 'rgba(167, 139, 250, 0.1)' : '#ede9fe',
-                  '& .MuiLinearProgress-bar': {
-                    borderRadius: '3px',
-                    backgroundColor: color,
-                  },
-                }}
-              />
-            </Box>
-          )}
-
-          {/* Description */}
-          {description && !progress && (
+          <Stack direction="row" spacing={0.7} alignItems="center">
+            <TrendingUpIcon sx={{ fontSize: '0.95rem', color }} />
             <Typography
               variant="caption"
               sx={{
-                color: isDark ? '#6b7a99' : '#94a3b8',
+                color: isDark ? '#aab6cf' : '#475569',
+                fontWeight: 500,
               }}
             >
-              {description}
+              {helperText}
             </Typography>
-          )}
+          </Stack>
+
+          <Button
+            component={Link}
+            href={actionHref}
+            variant="text"
+            size="small"
+            sx={{
+              textTransform: 'none',
+              alignSelf: 'flex-start',
+              px: 0,
+              minWidth: 'auto',
+              color,
+              fontWeight: 700,
+              '&:hover': {
+                backgroundColor: 'transparent',
+                color: isDark ? '#c4b5fd' : '#7c3aed',
+              },
+            }}
+          >
+            {actionLabel}
+          </Button>
         </Stack>
       </CardContent>
     </Card>
   );
 }
 
-export default function StatCards() {
+export default function StatCards({ kpis }: { kpis?: any }) {
   const { isDark } = useMuiTheme();
+
+  if (!kpis) return null;
 
   const stats: StatCardProps[] = [
     {
       title: 'Total Salons',
-      value: 234,
+      value: kpis.salons?.total || 0,
       icon: StorefrontIcon,
-      trend: 12.5,
       color: '#a78bfa',
       bgColor: isDark ? 'rgba(167, 139, 250, 0.1)' : '#f5f3ff',
-      description: '32 new registrations this month',
+      helperText: `${kpis.salons?.active || 0} active, ${kpis.salons?.pendingVerification || 0} pending verification`,
+      actionLabel: 'View all',
+      actionHref: '/admin/salons',
     },
     {
-      title: 'Active Users',
-      value: '8,542',
+      title: 'Total Users',
+      value: (kpis.users?.customers || 0) + (kpis.users?.salonOwners || 0),
       icon: PeopleIcon,
-      trend: 8.2,
       color: '#0ea5e9',
       bgColor: isDark ? 'rgba(14, 165, 233, 0.1)' : '#cffafe',
-      description: '1,245 new sign-ups this week',
+      helperText: `${kpis.users?.customers || 0} customers, ${kpis.users?.salonOwners || 0} salon owners`,
+      actionLabel: 'View users',
+      actionHref: '/admin/users',
     },
     {
-      title: 'Total Revenue',
-      value: 'Rs. 2.4M',
-      icon: TrendingUpIcon,
-      trend: 23.1,
+      title: 'Active Ads',
+      value: kpis.ads?.activeApproved || 0,
+      icon: OfferIcon,
       color: '#10b981',
       bgColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#d1fae5',
-      description: 'Monthly recurring revenue',
+      helperText: `${kpis.ads?.pendingApproval || 0} awaiting approval`,
+      actionLabel: 'Manage ads',
+      actionHref: '/admin/ads',
     },
     {
-      title: 'Conversion Rate',
-      value: '3.24%',
-      icon: OfferIcon,
-      trend: -2.4,
+      title: 'Pending Payments',
+      value: kpis.payments?.pendingVerification || 0,
+      icon: TrendingUpIcon,
       color: '#f59e0b',
       bgColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef3c7',
-      description: 'Down from 3.65% last month',
-      progress: 32,
+      helperText: 'Payments waiting for verification',
+      actionLabel: 'Review payments',
+      actionHref: '/admin/dashboard',
     },
   ];
 

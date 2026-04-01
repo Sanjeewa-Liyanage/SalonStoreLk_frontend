@@ -252,7 +252,7 @@ export default function AdminAdsPlansPage() {
 			setLoading(true);
 			setError('');
 			try {
-				const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+				const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 				if (!token) throw new Error('No access token found. Please login again.');
 
 				const payload = (await fetchAllPlans(token)) as PlanResponse;

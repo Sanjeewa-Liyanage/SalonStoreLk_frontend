@@ -13,6 +13,8 @@ import {
   MessageSquare,
   LogOut 
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 const menuItems = [
   { name: "Overview", icon: LayoutDashboard, href: "/salon_owner/dashboard" },
@@ -23,6 +25,13 @@ const menuItems = [
 
 export default function SidebarSalon() {
   const pathname = usePathname();
+  const { logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
+  };
 
   return (
     <div className="flex flex-col h-screen w-64 bg-black border-r border-neutral-800 text-white">
@@ -61,7 +70,7 @@ export default function SidebarSalon() {
       <div className="p-2 md:p-4 border-t border-neutral-800">
         <button 
           className="flex items-center gap-2 md:gap-3 w-full px-3 md:px-4 py-2 md:py-3 rounded-lg text-xs md:text-sm text-red-400 hover:bg-red-950/30 transition-all"
-          onClick={() => {/* Add logout logic */}}
+          onClick={handleLogout}
         >
           <LogOut size={18} />
           Sign Out

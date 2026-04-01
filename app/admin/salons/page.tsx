@@ -293,7 +293,7 @@ export default function AdminSalonsPage() {
 			setLoading(true);
 			setError('');
 			try {
-				const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+				const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 				if (!token) throw new Error('No access token found. Please login again.');
 
 				const payload = await fetchAllSalons(token);
@@ -385,7 +385,7 @@ export default function AdminSalonsPage() {
 		try {
 			setProcessingId(salonId);
 			setActionError(null);
-			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
 			await activateSalon(salonId, token);
@@ -406,7 +406,7 @@ export default function AdminSalonsPage() {
 		try {
 			setProcessingId(salonId);
 			setActionError(null);
-			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
 			await rejectSalon(salonId, reason, token);
@@ -426,7 +426,7 @@ export default function AdminSalonsPage() {
 		try {
 			setProcessingId(salonId);
 			setActionError(null);
-			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
 			await suspendSalon(salonId, reason, token);
@@ -446,7 +446,7 @@ export default function AdminSalonsPage() {
 		try {
 			setProcessingId(salonId);
 			setActionError(null);
-			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
 			await unsuspendSalon(salonId, token);
@@ -583,7 +583,7 @@ export default function AdminSalonsPage() {
 			setLoadingDialog(true);
 			setDialogError(null);
 
-			const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
 			if (!token) throw new Error('No access token found.');
 
 			const details = await fetchSalonDetails(salonId, token);

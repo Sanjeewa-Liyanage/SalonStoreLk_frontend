@@ -14,6 +14,8 @@ import {
   MenuItem,
   Chip,
   Typography,
+  Tabs,
+  Tab,
   Table,
   TableBody,
   TableCell,
@@ -24,113 +26,45 @@ import {
   Checkbox,
 } from '@mui/material';
 import {
+  CheckCircleOutline as CheckCircleOutlineIcon,
+  FilterList as FilterListIcon,
   Download as DownloadIcon,
   FileDownload as FileDownloadIcon,
+  HighlightOff as HighlightOffIcon,
   Search as SearchIcon,
 } from '@mui/icons-material';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { exportToCSV, exportToJSON, exportToPDF } from '@/utils/exportData';
 
-interface Salon {
-  id: string;
-  name: string;
-  owner: string;
-  location: string;
-  services: number;
-  rating: number;
-  status: 'active' | 'pending' | 'inactive';
-  registeredDate: string;
-  revenue: number;
-}
+type SalonTab = 'pending' | 'approved' | 'rejected';
 
-const SAMPLE_DATA: Salon[] = [
-  {
-    id: '1',
-    name: 'Glamour Studio',
-    owner: 'Sarah Ahmed',
-    location: 'Downtown, Colombo',
-    services: 12,
-    rating: 4.8,
-    status: 'active',
-    registeredDate: '2024-01-15',
-    revenue: 45000,
-  },
-  {
-    id: '2',
-    name: 'Beauty Haven',
-    owner: 'Jessica Chen',
-    location: 'Mall Road, Kandy',
-    services: 8,
-    rating: 4.6,
-    status: 'active',
-    registeredDate: '2024-02-10',
-    revenue: 32000,
-  },
-  {
-    id: '3',
-    name: 'Elegance Spa',
-    owner: 'Maria Rodriguez',
-    location: 'Beach Road, Galle',
-    services: 15,
-    rating: 4.9,
-    status: 'pending',
-    registeredDate: '2024-03-05',
-    revenue: 0,
-  },
-  {
-    id: '4',
-    name: 'Style Plus',
-    owner: 'Anika Patel',
-    location: 'City Center, Negombo',
-    services: 10,
-    rating: 4.5,
-    status: 'active',
-    registeredDate: '2024-01-20',
-    revenue: 28000,
-  },
-  {
-    id: '5',
-    name: 'Luxe Salon',
-    owner: 'Diana Prince',
-    location: 'Suburbs, Jaffna',
-    services: 7,
-    rating: 4.3,
-    status: 'inactive',
-    registeredDate: '2023-12-01',
-    revenue: 5000,
-  },
-  {
-    id: '6',
-    name: 'Radiant Beauty',
-    owner: 'Emma Watson',
-    location: 'Shopping District, Colombo',
-    services: 14,
-    rating: 4.7,
-    status: 'active',
-    registeredDate: '2024-02-20',
-    revenue: 52000,
-  },
-];
-
-const statusConfig: Record<string, { color: 'success' | 'warning' | 'error', label: string }> = {
+const statusConfig: Record<string, { color: 'success' | 'warning' | 'error' | 'default', label: string }> = {
   active: { color: 'success', label: 'Active' },
   pending: { color: 'warning', label: 'Pending' },
   inactive: { color: 'error', label: 'Inactive' },
+  draft: { color: 'default', label: 'Draft' },
 };
 
-export default function RecentSalons() {
+export default function RecentSalons({ activity }: { activity?: any }) {
   const { isDark } = useMuiTheme();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<SalonTab>('pending');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
-  const [data] = useState<Salon[]>(SAMPLE_DATA);
+
+  const pendingData = activity?.pendingSalons || [];
+  const approvedData = activity?.approvedSalons || [];
+  const rejectedData = activity?.rejectedSalons || [];
+
+  const tabData =
+    activeTab === 'approved' ? approvedData : activeTab === 'rejected' ? rejectedData : pendingData;
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const filteredData = data.filter((salon) =>
-    salon.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    salon.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    salon.location.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredData = tabData.filter((salon: any) =>
+    (salon.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (salon.ownerName || salon.owner || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (salon.city || salon.location || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleExportClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -142,55 +76,21 @@ export default function RecentSalons() {
   };
 
   const handleExportCSV = () => {
-    const exportData = {
-      columns: ['ID', 'Salon Name', 'Owner', 'Location', 'Services', 'Rating', 'Status', 'Registered Date', 'Revenue'],
-      rows: filteredData.map((salon) => ({
-        ID: salon.id,
-        'Salon Name': salon.name,
-        Owner: salon.owner,
-        Location: salon.location,
-        Services: salon.services,
-        Rating: salon.rating,
-        Status: salon.status,
-        'Registered Date': salon.registeredDate,
-        Revenue: `Rs. ${salon.revenue.toLocaleString()}`,
-      })),
-    };
-    exportToCSV(exportData, `salons-${new Date().toISOString().split('T')[0]}.csv`);
+    // Basic CSV implementation or integration with your utils
     handleExportClose();
   };
 
   const handleExportJSON = () => {
-    const exportData = {
-      columns: ['id', 'name', 'owner', 'location', 'services', 'rating', 'status', 'registeredDate', 'revenue'],
-      rows: filteredData,
-    };
-    exportToJSON(exportData, `salons-${new Date().toISOString().split('T')[0]}.json`);
     handleExportClose();
   };
 
-  const handleExportPDF = async () => {
-    const exportData = {
-      columns: ['Salon Name', 'Owner', 'Location', 'Services', 'Rating', 'Status', 'Revenue'],
-      rows: filteredData.map((salon) => ({
-        'Salon Name': salon.name,
-        Owner: salon.owner,
-        Location: salon.location,
-        Services: salon.services,
-        Rating: `${salon.rating} ⭐`,
-        Status: salon.status,
-        Revenue: `Rs. ${salon.revenue.toLocaleString()}`,
-      })),
-    };
-    await exportToPDF(exportData, `salons-${new Date().toISOString().split('T')[0]}.pdf`);
+  const handleExportPDF = () => {
     handleExportClose();
   };
-
-  const paginatedData = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      setSelectedRows(filteredData.map((s) => s.id));
+      setSelectedRows(filteredData.map((salon: any) => salon.id));
     } else {
       setSelectedRows([]);
     }
@@ -198,9 +98,22 @@ export default function RecentSalons() {
 
   const handleSelectRow = (id: string) => {
     setSelectedRows((prev) =>
-      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
     );
   };
+
+  const handleTabChange = (_event: React.SyntheticEvent, value: SalonTab) => {
+    setActiveTab(value);
+    setSelectedRows([]);
+    setPage(0);
+  };
+
+  const emptyLabel = activeTab === 'pending' ? 'No pending salons found.' : activeTab === 'approved' ? 'No approved salons available yet.' : 'No rejected salons available yet.';
+
+  const paginatedData = filteredData.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   return (
     <Card
@@ -211,22 +124,18 @@ export default function RecentSalons() {
       }}
     >
       <CardHeader
-        title="Recent Salons"
-        subheader={`${filteredData.length} salons in total`}
+        title="Pending Salons Table"
+        subheader="Search, filter, and manage approval workflows"
         action={
           <Button
-            variant="outlined"
-            size="small"
+            variant="contained"
             startIcon={<DownloadIcon />}
             onClick={handleExportClick}
             sx={{
-              borderRadius: '8px',
-              textTransform: 'none',
-              color: '#a78bfa',
-              borderColor: '#a78bfa',
+              backgroundColor: '#a78bfa',
+              color: '#fff',
               '&:hover': {
-                borderColor: '#c4b5fd',
-                backgroundColor: isDark ? 'rgba(167, 139, 250, 0.08)' : '#f5f3ff',
+                backgroundColor: '#8b5cf6',
               },
             }}
           >
@@ -239,21 +148,20 @@ export default function RecentSalons() {
             fontWeight: 700,
             fontSize: '1rem',
           },
+          '& .MuiCardHeader-subheader': {
+            color: isDark ? '#94a3b8' : '#64748b',
+          },
         }}
       />
-
-      {/* Export Menu */}
       <Menu
         anchorEl={exportMenuAnchor}
         open={Boolean(exportMenuAnchor)}
         onClose={handleExportClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         PaperProps={{
           sx: {
-            borderRadius: '8px',
             backgroundColor: isDark ? '#141828' : '#ffffff',
             border: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}`,
+            color: isDark ? '#e2e8f0' : '#1a1d2e',
           },
         }}
       >
@@ -272,12 +180,122 @@ export default function RecentSalons() {
       </Menu>
 
       <CardContent sx={{ p: 0 }}>
+        <Box sx={{ px: 2, pt: 1, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              minHeight: 40,
+              '& .MuiTabs-indicator': {
+                backgroundColor: '#a78bfa',
+              },
+            }}
+          >
+            <Tab
+              value="pending"
+              label={`Pending (${pendingData.length})`}
+              sx={{ textTransform: 'none', minHeight: 40, color: isDark ? '#cbd5e1' : '#475569' }}
+            />
+            <Tab
+              value="approved"
+              label={`Approved (${approvedData.length})`}
+              sx={{ textTransform: 'none', minHeight: 40, color: isDark ? '#cbd5e1' : '#475569' }}
+            />
+            <Tab
+              value="rejected"
+              label={`Rejected (${rejectedData.length})`}
+              sx={{ textTransform: 'none', minHeight: 40, color: isDark ? '#cbd5e1' : '#475569' }}
+            />
+          </Tabs>
+        </Box>
+
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={1}
+          justifyContent="space-between"
+          sx={{ p: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<FilterListIcon />}
+              sx={{
+                textTransform: 'none',
+                borderRadius: '8px',
+                borderColor: isDark ? '#334155' : '#cbd5e1',
+                color: isDark ? '#cbd5e1' : '#334155',
+              }}
+            >
+              Filters
+            </Button>
+            <Button
+              variant="outlined"
+              disabled
+              sx={{
+                textTransform: 'none',
+                borderRadius: '8px',
+                borderColor: isDark ? '#334155' : '#cbd5e1',
+                color: isDark ? '#94a3b8' : '#64748b',
+              }}
+            >
+              City
+            </Button>
+            <Button
+              variant="outlined"
+              disabled
+              sx={{
+                textTransform: 'none',
+                borderRadius: '8px',
+                borderColor: isDark ? '#334155' : '#cbd5e1',
+                color: isDark ? '#94a3b8' : '#64748b',
+              }}
+            >
+              Owner
+            </Button>
+            <Button
+              variant="outlined"
+              disabled
+              sx={{
+                textTransform: 'none',
+                borderRadius: '8px',
+                borderColor: isDark ? '#334155' : '#cbd5e1',
+                color: isDark ? '#94a3b8' : '#64748b',
+              }}
+            >
+              Date
+            </Button>
+          </Stack>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<CheckCircleOutlineIcon />}
+              disabled={activeTab !== 'pending' || selectedRows.length === 0}
+              sx={{ textTransform: 'none', borderRadius: '8px' }}
+            >
+              Approve Selected
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<HighlightOffIcon />}
+              disabled={activeTab !== 'pending' || selectedRows.length === 0}
+              sx={{ textTransform: 'none', borderRadius: '8px' }}
+            >
+              Reject Selected
+            </Button>
+          </Stack>
+        </Stack>
+
         {/* Search */}
         <Box sx={{ p: 2, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
           <TextField
             fullWidth
             size="small"
-            placeholder="Search salons by name, owner, or location..."
+            placeholder={`Search ${activeTab} salons by name, owner, or location...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             InputProps={{
@@ -316,7 +334,7 @@ export default function RecentSalons() {
                     sx={{ color: isDark ? '#6b7a99' : undefined }}
                   />
                 </TableCell>
-                {['Salon Name', 'Owner', 'Location', 'Services', 'Rating', 'Status', 'Revenue', 'Registered'].map((header) => (
+                {['Salon Name', 'Owner', 'Location', 'Status', 'Registered'].map((header) => (
                   <TableCell
                     key={header}
                     sx={{
@@ -331,9 +349,10 @@ export default function RecentSalons() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedData.map((salon) => {
+              {paginatedData.map((salon: any) => {
                 const isSelected = selectedRows.includes(salon.id);
-                const config = statusConfig[salon.status];
+                const statusKey = (salon.status || 'pending').toLowerCase();
+                const config = statusConfig[statusKey] || statusConfig.pending;
                 return (
                   <TableRow
                     key={salon.id}
@@ -363,39 +382,35 @@ export default function RecentSalons() {
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>{salon.name}</Typography>
                     </TableCell>
                     <TableCell sx={{ color: isDark ? '#e2e8f0' : '#1a1d2e', borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
-                      <Typography variant="body2">{salon.owner}</Typography>
+                      <Typography variant="body2">{salon.ownerName || salon.owner || 'N/A'}</Typography>
                     </TableCell>
                     <TableCell sx={{ color: isDark ? '#e2e8f0' : '#1a1d2e', borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
-                      <Typography variant="body2">{salon.location}</Typography>
-                    </TableCell>
-                    <TableCell sx={{ borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
-                      <Chip label={salon.services} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell sx={{ borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1a1d2e' }}>
-                        {salon.rating} ⭐
-                      </Typography>
+                      <Typography variant="body2">{salon.city || salon.location || 'N/A'}</Typography>
                     </TableCell>
                     <TableCell sx={{ borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
                       <Chip label={config.label} size="small" color={config.color} variant="outlined" />
                     </TableCell>
-                    <TableCell sx={{ borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }} align="right">
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: salon.revenue > 0 ? '#10b981' : '#6b7a99' }}>
-                        Rs. {salon.revenue.toLocaleString()}
-                      </Typography>
-                    </TableCell>
                     <TableCell sx={{ borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
                       <Typography variant="caption" sx={{ color: isDark ? '#e2e8f0' : '#1a1d2e' }}>
-                        {new Date(salon.registeredDate).toLocaleDateString('en-US', {
+                        {salon.createdAt || salon.registeredDate ? new Date(salon.createdAt || salon.registeredDate).toLocaleDateString('en-US', {
                           year: '2-digit',
                           month: 'short',
                           day: 'numeric',
-                        })}
+                        }) : 'N/A'}
                       </Typography>
                     </TableCell>
                   </TableRow>
                 );
               })}
+              {paginatedData.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
+                    <Typography variant="body2" sx={{ color: isDark ? '#6b7a99' : '#94a3b8' }}>
+                      {emptyLabel}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>

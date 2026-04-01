@@ -3,8 +3,17 @@
 import React, { useState, useEffect } from "react";
 import SidebarSalon from "@/components/SidebarSalon";
 import HeaderSalon from "@/components/HeaderSalon";
-import { MoreVertical, Eye, Heart, MessageCircle, TrendingUp, ChevronDown, Menu, X } from "lucide-react";
+import Link from "next/link";
+import {
+  Building2,
+  ChevronDown,
+  Clock3,
+  Megaphone,
+  Receipt,
+  Store,
+} from "lucide-react";
 import { fetchByOwner } from "@/lib/salonService";
+import { salonOwnerDashboardRequest } from "@/lib/dashboardService";
 import {
   Card,
   CardContent,
@@ -21,173 +30,224 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AuthGuard from "@/components/AuthGuard";
-import { useAuth } from "@/context/AuthContext";
+import { useAppSelector } from "@/lib/store/hooks";
 import AddSalonDialog from "@/components/AddSalonDialog";
 import { getStoredSalonId, setStoredSalonId } from "@/lib/salonSelection";
+
+type ActivityTab = "salons" | "ads" | "payments";
 
 export default function SalonDashboard() {
   const [salons, setSalons] = useState<any[]>([]);
   const [currentSalonId, setCurrentSalonId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [salonsLoading, setSalonsLoading] = useState(true);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [overview, setOverview] = useState<any>(null);
+  const [activityTab, setActivityTab] = useState<ActivityTab>("salons");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { user } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const user = useAppSelector((state) => state.auth.user);
 
-  // Fetch salons function
+  const parseSalonList = (payload: any) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.salons)) return payload.salons;
+    if (Array.isArray(payload?.data?.salons)) return payload.data.salons;
+    return [];
+  };
+
   const loadSalons = async () => {
     try {
       const accessToken = sessionStorage.getItem("accessToken");
+      if (!accessToken) {
+        setSalons([]);
+        return;
+      }
+
       if (accessToken) {
         const data = await fetchByOwner(accessToken);
-        console.log("Fetched salons data:", data);
-        setSalons(data || []);
+        const list = parseSalonList(data);
+        setSalons(list);
 
-        if (data && data.length > 0) {
+        if (list.length > 0) {
           const storedSalonId = getStoredSalonId();
-          const selectedSalon = data.find((salon: any) => salon.id === storedSalonId) || data[0];
+          const selectedSalon = list.find((salon: any) => salon.id === storedSalonId) || list[0];
           setCurrentSalonId(selectedSalon.id);
           setStoredSalonId(selectedSalon.id);
+        } else {
+          setCurrentSalonId(null);
         }
       }
     } catch (error) {
       console.error("Error fetching salons:", error);
     } finally {
-      setLoading(false);
+      setSalonsLoading(false);
     }
   };
 
-  // Fetch salons on component mount
+  const loadOverview = async () => {
+    try {
+      const accessToken = sessionStorage.getItem("accessToken");
+      if (!accessToken) {
+        setOverview(null);
+        return;
+      }
+
+      const response = await salonOwnerDashboardRequest(accessToken);
+      if (response?.success && response?.data) {
+        const normalizedData = response.data.data ? response.data.data : response.data;
+        setOverview(normalizedData);
+      } else {
+        setOverview(null);
+      }
+    } catch (error: any) {
+      console.error("Error fetching salon owner dashboard overview:", error);
+      setOverviewError(error?.message || "Failed to load dashboard overview");
+    } finally {
+      setOverviewLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadSalons();
+    loadOverview();
   }, []);
 
-  // Dummy data for stats
+  const currentSalon = salons.find((salon) => salon.id === currentSalonId);
+  const currentSalonName =
+    currentSalon?.salonName || currentSalon?.name || (salonsLoading ? "Loading salon..." : "No salon selected");
+  const currentSalonLocation =
+    currentSalon?.city ||
+    currentSalon?.location ||
+    currentSalon?.district ||
+    (salonsLoading ? "Loading location..." : salons.length > 0 ? "Location not available" : "No salons available");
+
+  const kpis = overview?.kpis;
+  const adsBySalon = overview?.charts?.adsBySalon || [];
+  const recentActivity = overview?.recentActivity || {};
+
   const stats = [
     {
-      title: "TOTAL VIEWS",
-      value: "2,847",
-      change: "+12.5%",
-      icon: Eye,
-      color: "text-orange-500",
-    },
-    {
-      title: "TOTAL LIKES",
-      value: "543",
-      change: "+8.2%",
-      icon: Heart,
-      color: "text-red-500",
-    },
-    {
-      title: "MESSAGES",
-      value: "28",
-      change: "+3%",
-      icon: MessageCircle,
-      color: "text-blue-500",
+      title: "TOTAL SALONS",
+      value: kpis?.salons?.total ?? 0,
+      helper: `${kpis?.salons?.active ?? 0} active`,
+      icon: Store,
+      color: "text-amber-600",
     },
     {
       title: "ACTIVE ADS",
-      value: "12",
-      change: "2 due to expire",
-      icon: TrendingUp,
-      color: "text-green-500",
+      value: kpis?.ads?.activeApproved ?? 0,
+      helper: `${kpis?.ads?.total ?? 0} total ads`,
+      icon: Megaphone,
+      color: "text-emerald-600",
+    },
+    {
+      title: "PENDING AD APPROVALS",
+      value: kpis?.ads?.pendingApproval ?? 0,
+      helper: `${kpis?.ads?.rejected ?? 0} rejected`,
+      icon: Clock3,
+      color: "text-blue-600",
+    },
+    {
+      title: "PENDING PAYMENTS",
+      value: kpis?.payments?.pendingVerification ?? 0,
+      helper: `${kpis?.payments?.rejected ?? 0} rejected payments`,
+      icon: Receipt,
+      color: "text-purple-600",
     },
   ];
 
-  // Dummy data for recent ads
-  const recentAds = [
-    {
-      id: 1,
-      title: "Summer Hair Cut Special",
-      category: "Hair Cutting",
-      status: "Active",
-      views: 234,
-      likes: 45,
-      messages: 8,
-      postedAt: "Posted 2 days ago",
-    },
-    {
-      id: 2,
-      title: "Bridal Makeup Package",
-      category: "Makeup",
-      status: "Active",
-      views: 567,
-      likes: 123,
-      messages: 15,
-      postedAt: "Posted 5 days ago",
-    },
-    {
-      id: 3,
-      title: "Full Body Spa Treatment",
-      category: "Spa & Wellness",
-      status: "Expiring",
-      views: 189,
-      likes: 32,
-      messages: 4,
-      postedAt: "Posted 10 days ago",
-    },
-    {
-      id: 4,
-      title: "Nail Art Design Class",
-      category: "Nails",
-      status: "Draft",
-      views: 0,
-      likes: 0,
-      messages: 0,
-      postedAt: "Posted 1 day ago",
-    },
-  ];
-
-  // Quick actions
   const quickActions = [
     {
       id: 1,
-      title: "Create New Ad",
-      description: "Post a new service or offer",
-      icon: "➕",
+      title: "Register New Salon",
+      description: "Create a new salon profile",
+      type: "dialog" as const,
     },
     {
       id: 2,
-      title: "View Analytics",
-      description: "Check performance metrics",
-      icon: "📊",
+      title: "Create New Ad",
+      description: "Post a new ad for your salon",
+      href: "/salon_owner/myads",
+      type: "link" as const,
     },
     {
       id: 3,
-      title: "Salon Settings",
-      description: "Update salon information",
-      icon: "⚙️",
+      title: "View My Ads",
+      description: "Manage active and pending ads",
+      href: "/salon_owner/myads",
+      type: "link" as const,
     },
     {
       id: 4,
-      title: "Get Help",
-      description: "Contact support team",
-      icon: "❓",
+      title: "Salon Settings",
+      description: "Update your salon information",
+      href: "/salon_owner/mysalons",
+      type: "link" as const,
+    },
+    {
+      id: 5,
+      title: "Help & Support",
+      description: "Get assistance when needed",
+      href: "/salon_owner/dashboard",
+      type: "link" as const,
     },
   ];
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const currentSalon =
-    salons.find((salon) => salon.id === currentSalonId)?.salonName ||
-    salons.find((salon) => salon.id === currentSalonId)?.name ||
-    "No salon selected";
 
   const handleSalonChange = (salonId: string) => {
     setCurrentSalonId(salonId);
     setStoredSalonId(salonId);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Active":
+  const getStatusColor = (status?: string) => {
+    switch ((status || "").toUpperCase()) {
+      case "ACTIVE":
+      case "APPROVED":
+      case "VERIFIED":
         return "bg-green-100 text-green-800";
-      case "Expiring":
+      case "PENDING":
         return "bg-yellow-100 text-yellow-800";
-      case "Draft":
+      case "REJECTED":
+      case "SUSPENDED":
+        return "bg-red-100 text-red-800";
+      case "DRAFT":
         return "bg-gray-100 text-gray-800";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-blue-100 text-blue-800";
     }
   };
+
+  const getReadableDateTime = (dateValue?: string) => {
+    if (!dateValue) return "N/A";
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return "N/A";
+    return parsed.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  const getReadableMethod = (method?: string) => {
+    if (!method) return "Payment";
+    return method
+      .toLowerCase()
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  };
+
+  const maxAdsCount = Math.max(...adsBySalon.map((item: any) => item.count || 0), 1);
+
+  const activityItems =
+    activityTab === "salons"
+      ? recentActivity?.salons || []
+      : activityTab === "ads"
+      ? recentActivity?.ads || []
+      : recentActivity?.payments || [];
+
+  const isPageLoading = salonsLoading || overviewLoading;
 
   return (
     <AuthGuard allowedRole="SALON_OWNER">
@@ -219,13 +279,13 @@ export default function SalonDashboard() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
               <div>
                 <h1 className="text-2xl md:text-4xl font-playfair font-bold text-gray-900">
-                  Welcome back, {user?.firstName || user?.name || 'User'}
+                  Welcome back, {user?.firstName || user?.name || "User"}
                 </h1>
                 <p className="text-gray-500 mt-1 text-sm md:text-base">
                   Manage your salons and ads in one place
                 </p>
               </div>
-              <Button 
+              <Button
                 onClick={() => setDialogOpen(true)}
                 className="bg-[#C8A84B] hover:bg-[#B39740] text-black font-semibold text-sm md:text-base w-full md:w-auto"
               >
@@ -240,18 +300,26 @@ export default function SalonDashboard() {
                   <div>
                     <CardTitle className="text-lg text-gray-900">CURRENT SALON</CardTitle>
                     <CardDescription className="text-gray-600">
-                      Colombo, Sri Lanka
+                      {currentSalonLocation}
                     </CardDescription>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="text-[#C8A84B] border-[#C8A84B] gap-2 w-full md:w-auto text-sm">
+                      <Button
+                        variant="outline"
+                        disabled={salonsLoading || salons.length === 0}
+                        className="text-[#C8A84B] border-[#C8A84B] gap-2 w-full md:w-auto text-sm"
+                      >
                         Switch Salon
                         <ChevronDown size={16} />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56 bg-white text-black border border-gray-200 shadow-lg">
-                      {salons.length > 0 ? (
+                      {salonsLoading ? (
+                        <DropdownMenuItem disabled className="text-gray-500">
+                          Loading salons...
+                        </DropdownMenuItem>
+                      ) : salons.length > 0 ? (
                         salons.map((salon) => (
                           <DropdownMenuItem
                             key={salon.id}
@@ -272,10 +340,18 @@ export default function SalonDashboard() {
               </CardHeader>
               <CardContent>
                 <h3 className="text-2xl font-playfair font-bold text-gray-900">
-                  {currentSalon}
+                  {currentSalonName}
                 </h3>
               </CardContent>
             </Card>
+
+            {overviewError && (
+              <Card className="mb-6 md:mb-8 border border-red-200 bg-red-50 shadow-none">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-red-700">{overviewError}</p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
@@ -293,10 +369,10 @@ export default function SalonDashboard() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-3xl font-bold text-gray-900 mb-1">
-                        {stat.value}
+                        {isPageLoading ? "..." : stat.value}
                       </div>
-                      <p className="text-xs text-green-600 font-medium">
-                        {stat.change}
+                      <p className="text-xs text-gray-500 font-medium">
+                        {stat.helper}
                       </p>
                     </CardContent>
                   </Card>
@@ -304,72 +380,171 @@ export default function SalonDashboard() {
               })}
             </div>
 
-            {/* Recent Ads and Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-              {/* Your Recent Ads */}
+            {/* Business Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-6 md:mb-8">
               <div className="lg:col-span-2">
                 <Card className="border-none shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-lg text-gray-900">Your Recent Ads</CardTitle>
+                    <CardTitle className="text-lg text-gray-900">Ads by Salon</CardTitle>
                     <CardDescription className="text-gray-600">
-                      Manage and view performance of your ads
+                      Simple distribution of your ads across salons
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {recentAds.map((ad) => (
-                        <div
-                          key={ad.id}
-                          className="flex flex-col md:flex-row md:items-center md:justify-between p-3 md:p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors gap-3"
+                    {overviewLoading ? (
+                      <p className="text-sm text-gray-500">Loading ad distribution...</p>
+                    ) : adsBySalon.length === 0 ? (
+                      <p className="text-sm text-gray-500">No ad distribution data available yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {adsBySalon
+                          .slice()
+                          .sort((a: any, b: any) => (b.count || 0) - (a.count || 0))
+                          .map((item: any, index: number) => {
+                            const percent = ((item.count || 0) / maxAdsCount) * 100;
+                            const isSelectedSalon = currentSalonName !== "No salon selected" && item.salonName === currentSalonName;
+
+                            return (
+                              <div key={`${item.salonName}-${index}`} className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                                    <span>{item.salonName}</span>
+                                    {isSelectedSalon && (
+                                      <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-[10px] uppercase tracking-wide">
+                                        Selected
+                                      </Badge>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-gray-500">{item.count || 0} ads</p>
+                                </div>
+                                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                                  <div
+                                    className="h-full bg-[#C8A84B] rounded-full"
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="border-none shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg text-gray-900">Status Summary</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Quick health snapshot for salons, ads, and payments
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Salons</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">Active {kpis?.salons?.active ?? 0}</Badge>
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending {kpis?.salons?.pendingVerification ?? 0}</Badge>
+                      <Badge variant="secondary" className="bg-red-100 text-red-800">Suspended {kpis?.salons?.suspended ?? 0}</Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ads</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">Active {kpis?.ads?.activeApproved ?? 0}</Badge>
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending {kpis?.ads?.pendingApproval ?? 0}</Badge>
+                      <Badge variant="secondary" className="bg-red-100 text-red-800">Rejected {kpis?.ads?.rejected ?? 0}</Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payments</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending {kpis?.payments?.pendingVerification ?? 0}</Badge>
+                      <Badge variant="secondary" className="bg-red-100 text-red-800">Rejected {kpis?.payments?.rejected ?? 0}</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Activity and Quick Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+              <div className="lg:col-span-2">
+                <Card className="border-none shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-gray-900">Recent Activity</CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Latest updates from your salons, ads, and payments
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {([
+                        { key: "salons", label: "Salons" },
+                        { key: "ads", label: "Ads" },
+                        { key: "payments", label: "Payments" },
+                      ] as { key: ActivityTab; label: string }[]).map((tab) => (
+                        <Button
+                          key={tab.key}
+                          variant={activityTab === tab.key ? "default" : "outline"}
+                          size="sm"
+                          className={
+                            activityTab === tab.key
+                              ? "bg-[#C8A84B] hover:bg-[#B39740] text-black"
+                              : "text-gray-700"
+                          }
+                          onClick={() => setActivityTab(tab.key)}
                         >
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
-                              <h4 className="font-semibold text-gray-900 text-sm md:text-base">
-                                {ad.title}
-                              </h4>
-                              <Badge
-                                className={`text-xs font-medium ${getStatusColor(
-                                  ad.status
-                                )}`}
-                                variant="secondary"
-                              >
-                                {ad.status}
-                              </Badge>
-                            </div>
-                            <p className="text-xs md:text-sm text-gray-600">{ad.category}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {ad.postedAt}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between md:gap-6 gap-3 md:mr-4">
-                            <div className="text-center">
-                              <p className="text-sm md:text-base font-semibold text-gray-900">
-                                {ad.views}
-                              </p>
-                              <p className="text-xs text-gray-500">views</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm md:text-base font-semibold text-gray-900">
-                                {ad.likes}
-                              </p>
-                              <p className="text-xs text-gray-500">likes</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm md:text-base font-semibold text-gray-900">
-                                {ad.messages}
-                              </p>
-                              <p className="text-xs text-gray-500">messages</p>
-                            </div>
-                          </div>
-                          <button className="p-2 hover:bg-gray-200 rounded-full md:ml-2">
-                            <MoreVertical size={18} className="text-gray-600" />
-                          </button>
-                        </div>
+                          {tab.label}
+                        </Button>
                       ))}
                     </div>
-                    <Button variant="ghost" className="w-full mt-4 text-gray-600">
-                      View All Ads
-                    </Button>
+
+                    {overviewLoading ? (
+                      <p className="text-sm text-gray-500">Loading recent activity...</p>
+                    ) : activityItems.length === 0 ? (
+                      <p className="text-sm text-gray-500">No recent {activityTab} activity yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {activityItems.map((item: any) => {
+                          const title =
+                            activityTab === "salons"
+                              ? item.salonName || "Salon"
+                              : activityTab === "ads"
+                              ? item.title || item.salonName || "Ad"
+                              : getReadableMethod(item.method);
+                          const subtitle =
+                            activityTab === "salons"
+                              ? "Salon update"
+                              : activityTab === "ads"
+                              ? `Salon: ${item.salonName || "N/A"}`
+                              : "Payment update";
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="flex items-start justify-between p-3 md:p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors gap-3"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-semibold text-gray-900 text-sm md:text-base">{title}</p>
+                                  <Badge
+                                    className={`text-xs font-medium ${getStatusColor(item.status)}`}
+                                    variant="secondary"
+                                  >
+                                    {item.status || "UPDATED"}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs md:text-sm text-gray-600">{subtitle}</p>
+                              </div>
+                              <p className="text-xs text-gray-500 whitespace-nowrap">
+                                {getReadableDateTime(item.createdAt)}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -381,34 +556,55 @@ export default function SalonDashboard() {
                 </h3>
                 <div className="space-y-3">
                   {quickActions.map((action) => (
-                    <Button
-                      key={action.id}
-                      variant="outline"
-                      className="w-full h-auto justify-start p-4 border-gray-200 hover:border-[#C8A84B] hover:bg-white bg-white"
-                    >
-                      <div className="text-left">
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {action.title}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          {action.description}
-                        </p>
-                      </div>
-                    </Button>
+                    action.type === "dialog" ? (
+                      <Button
+                        key={action.id}
+                        variant="outline"
+                        onClick={() => setDialogOpen(true)}
+                        className="w-full h-auto justify-start p-4 border-gray-200 hover:border-[#C8A84B] hover:bg-white bg-white"
+                      >
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-900 text-sm">
+                            {action.title}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            {action.description}
+                          </p>
+                        </div>
+                      </Button>
+                    ) : (
+                      <Button
+                        key={action.id}
+                        variant="outline"
+                        asChild
+                        className="w-full h-auto justify-start p-4 border-gray-200 hover:border-[#C8A84B] hover:bg-white bg-white"
+                      >
+                        <Link href={action.href || "/salon_owner/dashboard"}>
+                          <div className="text-left">
+                            <p className="font-semibold text-gray-900 text-sm">
+                              {action.title}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {action.description}
+                            </p>
+                          </div>
+                        </Link>
+                      </Button>
+                    )
                   ))}
                 </div>
 
-                {/* Pro Tip */}
                 <Card className="mt-6 border-orange-200 bg-orange-100 shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm flex items-center gap-2 text-orange-900">
-                      💡 Pro Tip
+                      <Building2 className="w-4 h-4" /> Owner Insight
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-xs text-orange-800">
-                      Add with more detailed descriptions and high-quality images
-                      get 3x more engagement. Update your salon gallery now!
+                      {kpis?.ads?.pendingApproval || kpis?.payments?.pendingVerification
+                        ? `You have ${(kpis?.ads?.pendingApproval || 0) + (kpis?.payments?.pendingVerification || 0)} pending ad/payment checks. Keep them up to date for smoother operations.`
+                        : "No pending approvals right now. Keep your salon and ads refreshed to maintain visibility."}
                     </p>
                   </CardContent>
                 </Card>

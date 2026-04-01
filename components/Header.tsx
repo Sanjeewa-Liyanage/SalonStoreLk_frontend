@@ -8,10 +8,7 @@ import { ChevronDown, Menu, Search, X, User, LogOut, Settings, Check,  } from 'l
 import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
 import Link from 'next/link';
-type AuthUser = {
-  name: string;
-  avatarUrl?: string;
-};
+import { useAuth } from '@/context/AuthContext';
 
 const LANGUAGES = [
   { code: 'en', label: 'English (UK)', nativeLabel: 'English', flag: '🇬🇧' },
@@ -21,11 +18,11 @@ const LANGUAGES = [
 interface HeaderProps {
   onNavigate?: (page: string) => void;
   currentPage?: string;
-  user?: AuthUser | null;
 }
 
-export default function Header({ onNavigate, currentPage = 'home', user = null }: HeaderProps) {
+export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps) {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -70,6 +67,11 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
       router.push('/find-salon');
     }
   }
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
+  };
 
   // ── Language button with dropdown ──
   function LangButton({ refProp, above = false }: { refProp: React.RefObject<HTMLDivElement | null>; above?: boolean }) {
@@ -127,8 +129,7 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
     if (!user) {
       return (
         <button
-          onClick={() => router.push('/login')}
-          
+          onClick={() => router.push('/auth/login')}
           className="flex items-center gap-2 bg-black/10 hover:bg-black/20 border border-black/20 text-black text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
         >
           <User size={15} />
@@ -136,6 +137,10 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
         </button>
       );
     } 
+
+    const displayName: string = user.firstName || user.lastName
+      ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'User'
+      : user.name || 'User';
 
     return (
       <div className="relative" ref={userMenuRef}>
@@ -146,11 +151,11 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
           aria-expanded={isUserMenuOpen}
         >
           {user.avatarUrl ? (
-            <Image src={user.avatarUrl} alt={user.name} width={28} height={28} className="rounded-full object-cover" />
+            <Image src={user.avatarUrl as string} alt={displayName} width={28} height={28} className="rounded-full object-cover" />
           ) : (
-            <Initials name={user.name} />
+            <Initials name={displayName} />
           )}
-          <span className="text-black text-sm font-semibold max-w-[120px] truncate">{user.name}</span>
+          <span className="text-black text-sm font-semibold max-w-[120px] truncate">{displayName}</span>
           <ChevronDown
             size={13}
             className={`text-black/60 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`}
@@ -161,7 +166,7 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
           <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-black/10 rounded-xl shadow-2xl overflow-hidden z-[9999]">
             <div className="px-4 py-3 border-b border-black/5">
               <p className="text-xs text-black/50 leading-none mb-0.5">Signed in as</p>
-              <p className="text-sm font-semibold text-black truncate">{user.name}</p>
+              <p className="text-sm font-semibold text-black truncate">{displayName}</p>
             </div>
             <button
               onClick={() => { setIsUserMenuOpen(false); onNavigate?.('profile'); }}
@@ -179,7 +184,7 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
             </button>
             <div className="border-t border-black/5">
               <button
-                onClick={() => { setIsUserMenuOpen(false); onNavigate?.('signout'); }}
+                onClick={handleLogout}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
               >
                 <LogOut size={14} />
@@ -362,15 +367,15 @@ export default function Header({ onNavigate, currentPage = 'home', user = null }
                 ) : (
                   <div className="flex items-center gap-2">
                     {user.avatarUrl ? (
-                      <Image src={user.avatarUrl} alt={user.name} width={28} height={28} className="rounded-full object-cover" />
+                      <Image src={user.avatarUrl as string} alt={user.name || 'User'} width={28} height={28} className="rounded-full object-cover" />
                     ) : (
                       <span className="w-7 h-7 rounded-full bg-[#D4A017] text-black text-xs font-bold flex items-center justify-center">
-                        {user.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
+                        {((user.firstName || user.name || 'U') as string).split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
                       </span>
                     )}
-                    <span className="text-white text-sm font-medium">{user.name}</span>
+                    <span className="text-white text-sm font-medium">{user.firstName || user.name || 'User'}</span>
                     <button
-                      onClick={() => { onNavigate?.('signout'); setIsMenuOpen(false); }}
+                      onClick={handleLogout}
                       className="ml-1 text-red-400 hover:text-red-300 transition-colors"
                       aria-label="Sign out"
                     >
