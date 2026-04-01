@@ -3,13 +3,22 @@ export interface Salon {
   name: string;
   category: 'ACADEMY & SALON' | 'CSI' | 'Gampaha';
   location: string;
+  city?: string;
+  salonCode?: string;
+  overview?: string;
   district: string;
   image: string;
   rating?: number;
   reviews?: number;
   description: string;
+  openingTime?: string;
+  closingTime?: string;
   services: Service[];
   gallery: string[];
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
   contact: {
     phone: string;
     whatsapp: string;

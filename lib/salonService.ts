@@ -1,10 +1,134 @@
 
 import axios from "axios";
 import { refreshAccessToken } from "./authService";
+import type { Salon, Service } from "./types";
+
+const FALLBACK_SALON_IMAGE =
+  "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1400&q=80";
+
+const CATEGORY_LOOKUP: Record<string, Salon["category"]> = {
+  "academy & salon": "ACADEMY & SALON",
+  csi: "CSI",
+  gampaha: "Gampaha",
+};
 
 interface SalonQueryOptions {
   page?: number;
   limit?: number;
+}
+
+function normalizeCategory(rawCategory?: string): Salon["category"] {
+  const normalized = String(rawCategory || "")
+    .trim()
+    .toLowerCase();
+
+  return CATEGORY_LOOKUP[normalized] ?? "ACADEMY & SALON";
+}
+
+function normalizeServices(rawServices: any): Service[] {
+  if (!Array.isArray(rawServices)) return [];
+
+  return rawServices
+    .filter((service) => service && typeof service === "object")
+    .map((service, index) => ({
+      id: String(service.id ?? `${service.name || "service"}-${index}`),
+      name: String(service.name ?? "Unnamed Service"),
+      category: String(service.category ?? "General"),
+      products: Array.isArray(service.products)
+        ? service.products.filter((product: unknown) => typeof product === "string")
+        : undefined,
+    }));
+}
+
+function normalizeSalon(rawSalon: any): Salon {
+  const gallery = Array.isArray(rawSalon?.gallery)
+    ? rawSalon.gallery
+    : Array.isArray(rawSalon?.images)
+      ? rawSalon.images
+      : [];
+
+  const safeGallery = gallery.filter((image: unknown) => typeof image === "string");
+  const primaryImage =
+    (typeof rawSalon?.image === "string" && rawSalon.image) ||
+    safeGallery[0] ||
+    FALLBACK_SALON_IMAGE;
+
+  const locationText =
+    typeof rawSalon?.location === "string" && rawSalon.location.trim().length > 0
+      ? rawSalon.location
+      : "";
+
+  const address =
+    rawSalon?.contact?.address ||
+    rawSalon?.address ||
+    locationText ||
+    rawSalon?.city ||
+    "Location not provided";
+
+  const phone =
+    rawSalon?.contact?.phone ||
+    rawSalon?.contactInfo?.phoneNumber ||
+    rawSalon?.phoneNumber ||
+    "Not provided";
+
+  const whatsapp =
+    rawSalon?.contact?.whatsapp ||
+    rawSalon?.contactInfo?.whatsappNumber ||
+    phone;
+
+  const district = String(rawSalon?.district || rawSalon?.city || "Sri Lanka");
+
+  const latitude = Number(rawSalon?.location?.latitude ?? rawSalon?.coordinates?.latitude);
+  const longitude = Number(rawSalon?.location?.longitude ?? rawSalon?.coordinates?.longitude);
+  const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+
+  return {
+    id: String(rawSalon?.id || ""),
+    name: String(rawSalon?.name || rawSalon?.salonName || "Unnamed Salon"),
+    salonCode: rawSalon?.salonCode ? String(rawSalon.salonCode) : undefined,
+    overview: rawSalon?.overview ? String(rawSalon.overview) : undefined,
+    category: normalizeCategory(rawSalon?.category),
+    location: String(locationText || rawSalon?.city || district),
+    city: rawSalon?.city ? String(rawSalon.city) : undefined,
+    district,
+    image: primaryImage,
+    rating:
+      typeof rawSalon?.rating === "number"
+        ? rawSalon.rating
+        : typeof rawSalon?.averageRating === "number"
+          ? rawSalon.averageRating
+          : 0,
+    reviews:
+      typeof rawSalon?.reviews === "number"
+        ? rawSalon.reviews
+        : typeof rawSalon?.reviewCount === "number"
+          ? rawSalon.reviewCount
+          : 0,
+    description: String(rawSalon?.description || rawSalon?.overview || "No description available."),
+            openingTime: rawSalon?.openingTime ? String(rawSalon.openingTime) : undefined,
+            closingTime: rawSalon?.closingTime ? String(rawSalon.closingTime) : undefined,
+    services: normalizeServices(rawSalon?.services),
+    gallery: safeGallery.length ? safeGallery : [primaryImage],
+            coordinates: hasCoordinates ? { latitude, longitude } : undefined,
+    contact: {
+      phone: String(phone),
+      whatsapp: String(whatsapp),
+      email: rawSalon?.contact?.email,
+      address: String(address),
+    },
+    qualifications: Array.isArray(rawSalon?.qualifications)
+      ? rawSalon.qualifications.filter((item: unknown) => typeof item === "string")
+      : [],
+    experience: Array.isArray(rawSalon?.experience)
+      ? rawSalon.experience.filter((item: unknown) => typeof item === "string")
+      : [],
+    socialMedia: {
+      facebook: rawSalon?.socialMedia?.facebook || rawSalon?.socialMediaLinks?.facebook,
+      instagram: rawSalon?.socialMedia?.instagram || rawSalon?.socialMediaLinks?.instagram,
+      tiktok: rawSalon?.socialMedia?.tiktok || rawSalon?.socialMediaLinks?.tiktok,
+      youtube: rawSalon?.socialMedia?.youtube || rawSalon?.socialMediaLinks?.youtube,
+    },
+  };
 }
 
 function buildSalonParams(
@@ -72,6 +196,25 @@ export const fetchRejectedSalons = (token: string, options?: SalonQueryOptions) 
   salonRequest(buildSalonParams({ type: "rejected" }, options), token);
 export const fetchSalonById    = (id: string, token: string) => salonRequest({ type: "by-id", id }, token);
 export const fetchByOwner      = (token: string) => salonRequest({ type: "by-owner" }, token);
+
+export async function getSalonById(id: string): Promise<Salon> {
+  const token = typeof window !== "undefined" ? sessionStorage.getItem("accessToken") : null;
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+  try {
+    const { data } = await axios.get(`/api/salons/${id}`, { headers });
+    return normalizeSalon(data?.data ?? data);
+  } catch (error: any) {
+    const shouldRetryWithRefresh = error?.response?.status === 401 && !!token;
+    if (!shouldRetryWithRefresh) throw error;
+
+    const nextAccessToken = await refreshAccessToken();
+    const { data } = await axios.get(`/api/salons/${id}`, {
+      headers: { Authorization: `Bearer ${nextAccessToken}` },
+    });
+    return normalizeSalon(data?.data ?? data);
+  }
+}
 
 
 // Fetch full salon details by ID from the dedicated endpoint
