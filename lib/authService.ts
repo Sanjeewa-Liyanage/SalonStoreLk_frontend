@@ -1,6 +1,22 @@
 import axios from "axios";
 import apiClient from "./axios";
 
+type ForgotPasswordResponse = {
+  token: string;
+  message: string;
+};
+
+type VerifyOtpResponse = {
+  message: string;
+  verifiedToken?: string;
+  [key: string]: any;
+};
+
+type ResetPasswordResponse = {
+  message: string;
+  [key: string]: any;
+};
+
 export async function loginUser(email: string, password: string) {
   const client = axios.create({
     baseURL: typeof window !== "undefined" ? window.location.origin : "",
@@ -14,6 +30,85 @@ export function RegisterUser(payload: any){
     });
     const data = client.post("/api/auth/register", payload);
     return data;
+}
+
+export async function requestForgotPassword(email: string): Promise<ForgotPasswordResponse> {
+  const client = axios.create({
+    baseURL: typeof window !== "undefined" ? window.location.origin : "",
+  });
+
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem("forgotPasswordToken");
+  }
+
+  const { data } = await client.post<ForgotPasswordResponse>("/api/auth/forgot-password", { email });
+
+  if (typeof window !== "undefined" && data?.token) {
+    sessionStorage.setItem("forgotPasswordToken", data.token);
+  }
+
+  return data;
+}
+
+export async function verifyForgotPasswordOtp(otp: string): Promise<VerifyOtpResponse> {
+  const token = typeof window !== "undefined" ? sessionStorage.getItem("forgotPasswordToken") : null;
+
+  if (!token) {
+    throw new Error("Forgot password token is missing. Please request OTP again.");
+  }
+
+  const client = axios.create({
+    baseURL: typeof window !== "undefined" ? window.location.origin : "",
+  });
+
+  const { data } = await client.post<VerifyOtpResponse>(
+    "/api/auth/verify-otp",
+    { otp },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!data?.verifiedToken) {
+    throw new Error("Verification succeeded but verified token is missing.");
+  }
+
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem("forgotPasswordToken");
+    sessionStorage.setItem("verifiedToken", data.verifiedToken);
+  }
+
+  return data;
+}
+
+export async function resetPasswordWithVerifiedToken(newPassword: string): Promise<ResetPasswordResponse> {
+  const token = typeof window !== "undefined" ? sessionStorage.getItem("verifiedToken") : null;
+
+  if (!token) {
+    throw new Error("Verified token is missing. Please verify OTP again.");
+  }
+
+  const client = axios.create({
+    baseURL: typeof window !== "undefined" ? window.location.origin : "",
+  });
+
+  const { data } = await client.post<ResetPasswordResponse>(
+    "/api/auth/reset-password",
+    { newPassword },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem("verifiedToken");
+  }
+
+  return data;
 }
 
 
