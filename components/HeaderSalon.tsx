@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useMuiTheme } from "@/context/MuiThemeContext";
 import { useAuth } from "@/context/AuthContext";
-import { logoutUser } from "@/lib/authService";
 import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
@@ -41,6 +40,14 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
   const handleLogout = () => {
     logout();
     router.push('/auth/login');
+  };
+
+  const handleProfileNavigation = () => {
+    router.push('/salon_owner/profile');
+  };
+
+  const handleSubscriptionNavigation = () => {
+    router.push('/salon_owner/dashboard');
   };
 
   const displayName = user?.name || user?.firstName || user?.lastName
@@ -95,7 +102,7 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 md:gap-3 hover:bg-neutral-50 p-1.5 rounded-lg transition-colors focus:outline-none">
             <Avatar className="h-8 md:h-9 w-8 md:w-9 border border-[#C8A84B]/30">
-              <AvatarImage src="" alt={displayName} />
+              <AvatarImage src={user?.avatarUrl || ''} alt={displayName} />
               <AvatarFallback className="bg-[#C8A84B]/10 text-[#C8A84B] text-xs font-bold">
                 {displayName.split(' ').map(n => n[0]).join('').toUpperCase() || 'SO'}
               </AvatarFallback>
@@ -110,10 +117,10 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
           <DropdownMenuContent align="end" className="w-56 mt-2">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer gap-2">
+            <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleProfileNavigation}>
               <User size={16} /> Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer gap-2">
+            <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleSubscriptionNavigation}>
               <Settings size={16} /> Subscription
             </DropdownMenuItem>
             <DropdownMenuSeparator />
