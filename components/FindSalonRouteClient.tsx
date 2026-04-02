@@ -13,6 +13,11 @@ export default function FindSalonRouteClient() {
         if (!safeId || safeId === 'undefined' || safeId === 'null') return;
         router.push(`/find-salon/${encodeURIComponent(safeId)}`);
       }}
+      onAdSelect={(adId) => {
+        const safeId = String(adId || '').trim();
+        if (!safeId || safeId === 'undefined' || safeId === 'null') return;
+        router.push(`/find-salon/ad/${encodeURIComponent(safeId)}`);
+      }}
     />
   );
 }
