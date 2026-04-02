@@ -33,6 +33,7 @@ import { useMuiTheme } from '@/context/MuiThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const MENU_ITEMS = [
   {
@@ -140,38 +141,32 @@ export default function Sidebar() {
       {/* Header */}
       <Box sx={{ p: 2.5, borderBottom: `1px solid ${isDark ? '#1e2440' : '#eaecf5'}` }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #a78bfa, #c4b5fd)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontWeight: 700,
-                fontSize: '0.875rem',
-              }}
-            >
-              SS
-            </Box>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                background: 'linear-gradient(135deg, #a78bfa, #c4b5fd)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                display: { xs: 'none', sm: 'block' },
-              }}
-            >
-              SalonStore
-            </Typography>
-          </Stack>
+          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }} aria-label="Go to homepage">
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Image
+                src="/logo.png"
+                alt="SalonStore"
+                width={36}
+                height={36}
+                priority
+                style={{ borderRadius: 8, objectFit: 'cover' }}
+              />
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  background: 'linear-gradient(135deg, #a78bfa, #c4b5fd)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  display: { xs: 'none', sm: 'block' },
+                }}
+              >
+                SalonStore
+              </Typography>
+            </Stack>
+          </Link>
           {isMobile && (
             <IconButton size="small" onClick={handleDrawerToggle}>
               <CloseIcon sx={{ fontSize: '1.2rem' }} />

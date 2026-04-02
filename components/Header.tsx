@@ -73,6 +73,22 @@ export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps
     router.push('/auth/login');
   };
 
+  const handleMyProfileNavigation = () => {
+    const role = (user?.role || '').toUpperCase();
+
+    if (role === 'ADMIN') {
+      router.push('/admin/dashboard');
+      return;
+    }
+
+    if (role === 'SALON_OWNER') {
+      router.push('/salon_owner/dashboard');
+      return;
+    }
+
+    onNavigate?.('profile');
+  };
+
   // ── Language button with dropdown ──
   function LangButton({ refProp, above = false }: { refProp: React.RefObject<HTMLDivElement | null>; above?: boolean }) {
     return (
@@ -169,7 +185,7 @@ export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps
               <p className="text-sm font-semibold text-black truncate">{displayName}</p>
             </div>
             <button
-              onClick={() => { setIsUserMenuOpen(false); onNavigate?.('profile'); }}
+              onClick={() => { setIsUserMenuOpen(false); handleMyProfileNavigation(); }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-black hover:bg-amber-50 transition-colors"
             >
               <User size={14} className="text-black/50" />
