@@ -44,6 +44,7 @@ type PagedResponse<T> = {
 
 interface FindSalonPageProps {
   onSalonSelect?: (salonId: string) => void;
+  onAdSelect?: (adId: string) => void;
 }
 
 const SALONS_PER_PAGE = 10;
@@ -146,7 +147,7 @@ function AdImageLayout({ images, title }: { images: string[]; title: string }) {
   );
 }
 
-export default function FindSalonPage({ onSalonSelect }: FindSalonPageProps) {
+export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPageProps) {
   const [salons, setSalons] = useState<SalonDto[]>([]);
   const [ads, setAds] = useState<AdDto[]>([]);
   const [salonPage, setSalonPage] = useState(1);
@@ -350,7 +351,19 @@ export default function FindSalonPage({ onSalonSelect }: FindSalonPageProps) {
 
         <div className="mt-5 space-y-4">
           {ads.map((ad) => (
-            <article key={ad.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
+            <article
+              key={ad.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onAdSelect?.(ad.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onAdSelect?.(ad.id);
+                }
+              }}
+              className="cursor-pointer overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm"
+            >
               <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-black">{ad.salonName || 'SalonStore Partner'}</p>
@@ -374,6 +387,10 @@ export default function FindSalonPage({ onSalonSelect }: FindSalonPageProps) {
                 </div>
                 <button
                   type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAdSelect?.(ad.id);
+                  }}
                   className="rounded-md bg-[#d4a017] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c79614]"
                 >
                   Learn More

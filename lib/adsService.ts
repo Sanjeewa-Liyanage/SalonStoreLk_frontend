@@ -146,4 +146,9 @@ export async function getByPriority(page = 1, limit = 10) {
         params: { page, limit },
     });
 }
+
+export async function getAdDetails(adId: string) {
+    const { data } = await axios.get(`/api/ads/details/${adId}`);
+    return data;
+}
 //todo need to change
