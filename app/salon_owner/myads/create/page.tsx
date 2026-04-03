@@ -185,6 +185,7 @@ export default function CreateAdPage() {
         imageUrl,
         planId,
         salonId: selectedSalonId,
+        paymentMethod: "BANK_TRANSFER",
       };
 
       const created = await createAd(payload);
@@ -198,7 +199,12 @@ export default function CreateAdPage() {
       setPaymentDialogOpen(true);
       toast.success("Ad created. Now upload payment proof to continue.");
     } catch (error: any) {
-      toast.error(error?.message || error?.response?.data?.message || "Failed to create ad");
+      const backendMessage = error?.response?.data?.message;
+      const normalizedMessage = Array.isArray(backendMessage)
+        ? backendMessage.join(", ")
+        : backendMessage;
+
+      toast.error(normalizedMessage || error?.message || "Failed to create ad");
     } finally {
       setCreatingAd(false);
     }
@@ -251,7 +257,12 @@ export default function CreateAdPage() {
       setPaymentDialogOpen(false);
       router.push("/salon_owner/myads");
     } catch (error: any) {
-      toast.error(error?.message || error?.response?.data?.message || "Failed to submit payment");
+      const backendMessage = error?.response?.data?.message;
+      const normalizedMessage = Array.isArray(backendMessage)
+        ? backendMessage.join(", ")
+        : backendMessage;
+
+      toast.error(normalizedMessage || error?.message || "Failed to submit payment");
     } finally {
       setSubmittingPayment(false);
     }

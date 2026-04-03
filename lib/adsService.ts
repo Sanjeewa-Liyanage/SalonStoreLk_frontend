@@ -38,9 +38,9 @@ export async function createAd(adData: any) {
     }
 
 }
-export async function adsBySalon(salonId: string, accessToken: string) {
+export async function getAdsBySalon(salonId: string, accessToken: string) {
     try {
-        const { data } = await axios.get(`/api/ads/${salonId}`, {
+        const { data } = await axios.get(`/api/ads/salon/${salonId}`, {
             headers: { Authorization: `Bearer ${accessToken}` },
         });
         return data;
@@ -48,7 +48,7 @@ export async function adsBySalon(salonId: string, accessToken: string) {
     } catch (error: any) {
         if (error?.response?.status !== 401) throw error;
         const nextAccessToken = await refreshAccessToken();
-        const { data } = await axios.get(`/api/ads/${salonId}`, {
+        const { data } = await axios.get(`/api/ads/salon/${salonId}`, {
             headers: { Authorization: `Bearer ${nextAccessToken}` },
         });
         return data;

@@ -7,7 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import HeaderSalon from "@/components/HeaderSalon";
 import SidebarSalon from "@/components/SidebarSalon";
 import { fetchByOwner } from "@/lib/salonService";
-import { adsBySalon } from "@/lib/adsService";
+import { getAdsBySalon } from "@/lib/adsService";
 import { getStoredSalonId, setStoredSalonId } from "@/lib/salonSelection";
 import {
 	Card,
@@ -118,7 +118,7 @@ export default function MyAdsPage() {
 				setError(null);
 
 				const accessToken = sessionStorage.getItem("accessToken") || "";
-				const result = await adsBySalon(selectedSalonId, accessToken);
+				const result = await getAdsBySalon(selectedSalonId, accessToken);
 				const adList = Array.isArray(result) ? result : result?.data || [];
 				setAds(adList);
 			} catch (adsError: any) {
