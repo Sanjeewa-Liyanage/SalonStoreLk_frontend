@@ -20,7 +20,6 @@ import {
   Chip,
   Stack,
   Typography,
-  Paper,
   InputAdornment,
 } from '@mui/material';
 import {
@@ -122,6 +121,16 @@ export default function HeaderAdmin({
     router.push('/auth/login');
   };
 
+  const handleProfileNavigation = () => {
+    handleUserClose();
+    router.push('/admin/profile');
+  };
+
+  const handleSettingsNavigation = () => {
+    handleUserClose();
+    router.push('/admin/settings');
+  };
+
   const markAllRead = () => {
     setNotifications((n) => n.map((x) => ({ ...x, unread: false })));
   };
@@ -138,7 +147,7 @@ export default function HeaderAdmin({
     : 'AD';
   
   // Use user avatar if available
-  const avatarSrc = user?.avatarUrl || '';
+  const avatarSrc = user?.profilePictureUrl || user?.avatarUrl || '';
 
   return (
     <>
@@ -256,11 +265,14 @@ export default function HeaderAdmin({
             </IconButton>
 
             {/* User Menu */}
-            <IconButton
+            <Button
               onClick={handleUserClick}
               sx={{
-                p: 0,
+                p: 0.4,
+                minWidth: 'auto',
                 borderRadius: '10px',
+                textTransform: 'none',
+                gap: 1,
                 '&:hover': {
                   backgroundColor: isDark ? 'rgba(167, 139, 250, 0.1)' : '#f5f3ff',
                 },
@@ -278,7 +290,21 @@ export default function HeaderAdmin({
               >
                 {!avatarSrc && initials}
               </Avatar>
-            </IconButton>
+              <Typography
+                sx={{
+                  display: { xs: 'none', sm: 'block' },
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  color: isDark ? '#dbe4ff' : '#1f2937',
+                  maxWidth: 120,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {displayName}
+              </Typography>
+            </Button>
           </Stack>
         </Toolbar>
       </AppBar>
@@ -485,8 +511,7 @@ export default function HeaderAdmin({
         </Box>
 
         <MenuItem
-          href="/admin/profile"
-          component="a"
+          onClick={handleProfileNavigation}
           sx={{
             py: 1.5,
             px: 2,
@@ -501,8 +526,7 @@ export default function HeaderAdmin({
         </MenuItem>
 
         <MenuItem
-          href="/admin/settings"
-          component="a"
+          onClick={handleSettingsNavigation}
           sx={{
             py: 1.5,
             px: 2,

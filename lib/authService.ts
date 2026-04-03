@@ -118,6 +118,27 @@ export async function getUserProfile() {
   return data;
 }
 
+export async function updateUserProfile(payload: Record<string, any>) {
+  const token = sessionStorage.getItem("accessToken");
+  if (!token) {
+    throw new Error("No access token found. Please login again.");
+  }
+
+  try {
+    const { data } = await axios.post("/api/auth/edit-profile", payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch (error: any) {
+    if (error?.response?.status !== 401) throw error;
+    const nextAccessToken = await refreshAccessToken();
+    const { data } = await axios.post("/api/auth/edit-profile", payload, {
+      headers: { Authorization: `Bearer ${nextAccessToken}` },
+    });
+    return data;
+  }
+}
+
 export async function refreshAccessToken() {
     const refreshToken = sessionStorage.getItem("refreshToken");
 
