@@ -81,11 +81,6 @@ const MENU_ITEMS = [
     href: '/admin/adsplans',
 
   },
-  {
-    label: 'Settings',
-    icon: SettingsIcon,
-    href: '/admin/settings',
-  },
 ];
 
 export default function Sidebar() {
