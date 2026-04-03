@@ -46,13 +46,14 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
     router.push('/salon_owner/profile');
   };
 
-  const handleSubscriptionNavigation = () => {
-    router.push('/salon_owner/dashboard');
+  const handleSettingsNavigation = () => {
+    router.push('/salon_owner/settings');
   };
 
   const displayName = user?.name || user?.firstName || user?.lastName
     ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
     : 'Salon Owner';
+  const avatarSrc = user?.profilePictureUrl || user?.avatarUrl || undefined;
 
   const greeting = getGreeting();
 
@@ -102,7 +103,7 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 md:gap-3 hover:bg-neutral-50 p-1.5 rounded-lg transition-colors focus:outline-none">
             <Avatar className="h-8 md:h-9 w-8 md:w-9 border border-[#C8A84B]/30">
-              <AvatarImage src={user?.profilePictureUrl || user?.avatarUrl || ''} alt={displayName} />
+              <AvatarImage src={avatarSrc} alt={displayName} />
               <AvatarFallback className="bg-[#C8A84B]/10 text-[#C8A84B] text-xs font-bold">
                 {displayName.split(' ').map(n => n[0]).join('').toUpperCase() || 'SO'}
               </AvatarFallback>
@@ -114,18 +115,30 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
             <ChevronDown size={14} className="text-neutral-400 hidden md:block" />
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-56 mt-2">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuContent
+            align="end"
+            className="w-56 mt-2 bg-white text-black border border-neutral-200 shadow-xl"
+          >
+            <DropdownMenuLabel className="text-black">My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleProfileNavigation}>
-              <User size={16} /> Profile
+            <DropdownMenuItem
+              className="cursor-pointer gap-2 text-black focus:text-black focus:bg-neutral-100"
+              onClick={handleProfileNavigation}
+            >
+              <User size={16} className="text-black" /> Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleSubscriptionNavigation}>
-              <Settings size={16} /> Subscription
+            <DropdownMenuItem
+              className="cursor-pointer gap-2 text-black focus:text-black focus:bg-neutral-100"
+              onClick={handleSettingsNavigation}
+            >
+              <Settings size={16} className="text-black" /> Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer gap-2 text-red-500 focus:text-red-500" onClick={handleLogout}>
-              <LogOut size={16} /> Sign out
+            <DropdownMenuItem
+              className="cursor-pointer gap-2 text-black focus:text-black focus:bg-neutral-100"
+              onClick={handleLogout}
+            >
+              <LogOut size={16} className="text-black" /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
