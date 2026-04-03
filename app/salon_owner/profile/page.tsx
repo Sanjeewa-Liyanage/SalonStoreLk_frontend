@@ -5,7 +5,9 @@ import { Mail, Phone, CalendarDays, BadgeCheck, UserCircle2 } from 'lucide-react
 import AuthGuard from '@/components/AuthGuard';
 import SidebarSalon from '@/components/SidebarSalon';
 import HeaderSalon from '@/components/HeaderSalon';
-import { getUserProfile } from '@/lib/authService';
+import EditProfileDialogSalon, { SalonProfileFormValues } from '@/components/EditProfileDialogSalon';
+import { useAuth } from '@/context/AuthContext';
+import { getUserProfile, updateUserProfile } from '@/lib/authService';
 
 type TimestampLike =
 	| string
@@ -24,7 +26,7 @@ interface SalonOwnerProfile {
 	lastName?: string;
 	email?: string;
 	role?: string;
-	avatarUrl?: string;
+	profilePictureUrl?: string;
 	phoneNumber?: string;
 	createdAt?: TimestampLike;
 	updatedAt?: TimestampLike;
@@ -70,6 +72,8 @@ export default function SalonOwnerProfilePage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [profile, setProfile] = useState<SalonOwnerProfile | null>(null);
+	const [editOpen, setEditOpen] = useState(false);
+	const { refreshUser } = useAuth();
 
 	useEffect(() => {
 		let mounted = true;
@@ -118,9 +122,33 @@ export default function SalonOwnerProfilePage() {
 		return value || 'SO';
 	}, [displayName]);
 
+	const handleProfileUpdate = async (payload: Partial<SalonProfileFormValues>) => {
+		const response = await updateUserProfile(payload);
+		const updated = parseProfile(response);
+		setProfile((prev) => {
+			const merged = { ...(prev || {}), ...payload } as SalonOwnerProfile;
+			return Object.keys(updated || {}).length ? { ...merged, ...updated } : merged;
+		});
+		await refreshUser();
+		setEditOpen(false);
+	};
+
 	return (
 		<AuthGuard allowedRole="SALON_OWNER">
 			<div className="flex h-screen bg-gray-50">
+				<EditProfileDialogSalon
+					open={editOpen}
+					onClose={() => setEditOpen(false)}
+					userId={profile?.id || null}
+					profile={{
+						firstName: profile?.firstName || '',
+						lastName: profile?.lastName || '',
+						phoneNumber: profile?.phoneNumber || '',
+						profilePictureUrl: profile?.profilePictureUrl || '',
+						email: profile?.email || '',
+					}}
+					onSubmit={handleProfileUpdate}
+				/>
 				<div className="hidden md:block">
 					<SidebarSalon />
 				</div>
@@ -145,10 +173,10 @@ export default function SalonOwnerProfilePage() {
 									<p className="text-gray-500 mt-1 text-sm md:text-base">View your salon owner account details.</p>
 								</div>
 								<button
-									disabled
-									className="bg-neutral-200 text-neutral-500 px-4 py-2 rounded-md text-sm font-medium cursor-not-allowed"
+									onClick={() => setEditOpen(true)}
+									className="bg-[#C8A84B] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#b6903f] transition"
 								>
-									Edit Profile (Coming Soon)
+									Edit Profile
 								</button>
 							</div>
 
@@ -160,9 +188,9 @@ export default function SalonOwnerProfilePage() {
 								<>
 									<section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-7 mb-6">
 										<div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-											{profile?.avatarUrl ? (
+											{profile?.profilePictureUrl ? (
 												<img
-													src={profile.avatarUrl}
+													src={profile.profilePictureUrl}
 													alt={displayName}
 													className="w-16 h-16 rounded-full object-cover border border-[#C8A84B]/40"
 												/>

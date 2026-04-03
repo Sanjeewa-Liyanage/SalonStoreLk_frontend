@@ -102,7 +102,7 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 md:gap-3 hover:bg-neutral-50 p-1.5 rounded-lg transition-colors focus:outline-none">
             <Avatar className="h-8 md:h-9 w-8 md:w-9 border border-[#C8A84B]/30">
-              <AvatarImage src={user?.avatarUrl || ''} alt={displayName} />
+              <AvatarImage src={user?.profilePictureUrl || user?.avatarUrl || ''} alt={displayName} />
               <AvatarFallback className="bg-[#C8A84B]/10 text-[#C8A84B] text-xs font-bold">
                 {displayName.split(' ').map(n => n[0]).join('').toUpperCase() || 'SO'}
               </AvatarFallback>
