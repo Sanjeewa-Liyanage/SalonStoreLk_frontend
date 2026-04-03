@@ -71,6 +71,7 @@ export const uploadTransactionImage = async (file: File, userId:string, salonCod
     throw error;
   }
 }
+
 export const uploadAdImages = async (file:File, salonCode:string, adId:string): Promise<{ url: string; path: string }> => {
   try{
     // Validate file type - only images allowed
@@ -92,6 +93,31 @@ export const uploadAdImages = async (file:File, salonCode:string, adId:string): 
 
     };
   }catch(error){
+    console.error("Firebase Upload Error:", error);
+    throw error;
+  }
+}
+
+export const uploadProfileImage = async (file:File, userId:string): Promise<{ url: string; path: string }> => {
+  try{
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png',  'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error(`Invalid file type. Only PDF and image files (JPEG, PNG, WebP) are allowed. Received: ${file.type}`);
+    }
+    const maxSizeInBytes = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSizeInBytes) {
+      throw new Error(`File size exceeds 10MB limit. Current size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    }
+
+    const storagePath = `profile/${userId}/${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, storagePath);
+    const snapshot = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return {
+      url: downloadURL,
+      path: storagePath
+    };
+  }catch(error:any){
     console.error("Firebase Upload Error:", error);
     throw error;
   }

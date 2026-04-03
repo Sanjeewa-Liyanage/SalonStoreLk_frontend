@@ -12,6 +12,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   name?: string;
+  profilePictureUrl?: string;
   avatarUrl?: string;
 }
 
@@ -19,6 +20,7 @@ interface AuthContextType {
   user: User | null;
   login: (token: string, refreshToken: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -83,6 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchUser(token);
   };
 
+  const refreshUser = async () => {
+    const token = sessionStorage.getItem("accessToken");
+    if (!token) return;
+    await fetchUser(token);
+  };
+
   const logout = () => {
     sessionStorage.removeItem("accessToken");
     sessionStorage.removeItem("refreshToken");
@@ -92,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, refreshUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

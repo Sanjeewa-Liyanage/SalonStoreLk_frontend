@@ -166,8 +166,14 @@ export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps
           aria-haspopup="true"
           aria-expanded={isUserMenuOpen}
         >
-          {user.avatarUrl ? (
-            <Image src={user.avatarUrl as string} alt={displayName} width={28} height={28} className="rounded-full object-cover" />
+          {user.profilePictureUrl || user.avatarUrl ? (
+            <Image
+              src={(user.profilePictureUrl || user.avatarUrl) as string}
+              alt={displayName}
+              width={28}
+              height={28}
+              className="rounded-full object-cover"
+            />
           ) : (
             <Initials name={displayName} />
           )}
@@ -382,8 +388,14 @@ export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps
                   </button>
                 ) : (
                   <div className="flex items-center gap-2">
-                    {user.avatarUrl ? (
-                      <Image src={user.avatarUrl as string} alt={user.name || 'User'} width={28} height={28} className="rounded-full object-cover" />
+                    {user.profilePictureUrl || user.avatarUrl ? (
+                      <Image
+                        src={(user.profilePictureUrl || user.avatarUrl) as string}
+                        alt={user.name || 'User'}
+                        width={28}
+                        height={28}
+                        className="rounded-full object-cover"
+                      />
                     ) : (
                       <span className="w-7 h-7 rounded-full bg-[#D4A017] text-black text-xs font-bold flex items-center justify-center">
                         {((user.firstName || user.name || 'U') as string).split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}

@@ -147,7 +147,7 @@ export default function HeaderAdmin({
     : 'AD';
   
   // Use user avatar if available
-  const avatarSrc = user?.avatarUrl || '';
+  const avatarSrc = user?.profilePictureUrl || user?.avatarUrl || '';
 
   return (
     <>

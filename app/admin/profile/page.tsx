@@ -27,8 +27,10 @@ import {
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import AuthGuard from '@/components/AuthGuard';
+import EditProfileDialog, { ProfileFormValues } from '@/components/EditProfileDialog';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { getUserProfile } from '@/lib/authService';
+import { useAuth } from '@/context/AuthContext';
+import { getUserProfile, updateUserProfile } from '@/lib/authService';
 
 type TimestampLike =
 	| string
@@ -47,7 +49,7 @@ interface AdminProfile {
 	lastName?: string;
 	email?: string;
 	role?: string;
-	avatarUrl?: string;
+	profilePictureUrl?: string;
 	phoneNumber?: string;
 	createdAt?: TimestampLike;
 	updatedAt?: TimestampLike;
@@ -100,11 +102,13 @@ function formatRole(role?: string): string {
 export default function AdminProfilePage() {
 	const muiTheme = useTheme();
 	const { isDark } = useMuiTheme();
+	const { refreshUser } = useAuth();
 	const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
 	const [profile, setProfile] = useState<AdminProfile | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [editOpen, setEditOpen] = useState(false);
 
 	useEffect(() => {
 		let mounted = true;
@@ -153,6 +157,17 @@ export default function AdminProfilePage() {
 		return chars || 'AD';
 	}, [displayName]);
 
+	const handleProfileUpdate = async (payload: Partial<ProfileFormValues>) => {
+		const response = await updateUserProfile(payload);
+		const updated = extractProfile(response);
+		setProfile((prev) => {
+			const merged = { ...(prev || {}), ...payload } as AdminProfile;
+			return Object.keys(updated || {}).length ? { ...merged, ...updated } : merged;
+		});
+		await refreshUser();
+		setEditOpen(false);
+	};
+
 	return (
 		<AuthGuard allowedRole="ADMIN">
 			<Box
@@ -162,6 +177,19 @@ export default function AdminProfilePage() {
 					backgroundColor: isDark ? '#0d0f1a' : '#f9fafb',
 				}}
 			>
+				<EditProfileDialog
+					open={editOpen}
+					onClose={() => setEditOpen(false)}
+					userId={profile?.id || null}
+					profile={{
+						firstName: profile?.firstName || '',
+						lastName: profile?.lastName || '',
+						phoneNumber: profile?.phoneNumber || '',
+						profilePictureUrl: profile?.profilePictureUrl || '',
+						email: profile?.email || '',
+					}}
+					onSubmit={handleProfileUpdate}
+				/>
 				{!isMobile && <Sidebar />}
 
 				<Box
@@ -228,7 +256,7 @@ export default function AdminProfilePage() {
 											>
 												<Stack direction="row" spacing={2} alignItems="center">
 													<Avatar
-														src={profile?.avatarUrl || ''}
+														src={profile?.profilePictureUrl || ''}
 														sx={{
 															width: 64,
 															height: 64,
@@ -237,7 +265,7 @@ export default function AdminProfilePage() {
 															background: 'linear-gradient(135deg, #a78bfa, #c4b5fd)',
 														}}
 													>
-														{!profile?.avatarUrl && initials}
+														{!profile?.profilePictureUrl && initials}
 													</Avatar>
 
 													<Box>
@@ -269,7 +297,7 @@ export default function AdminProfilePage() {
 
 												<Button
 													variant="outlined"
-													disabled
+													onClick={() => setEditOpen(true)}
 													sx={{
 														textTransform: 'none',
 														borderRadius: '10px',
@@ -277,7 +305,7 @@ export default function AdminProfilePage() {
 														color: isDark ? '#94a3b8' : '#64748b',
 													}}
 												>
-													Edit Profile (Coming Soon)
+													Edit Profile
 												</Button>
 											</Stack>
 										</CardContent>
