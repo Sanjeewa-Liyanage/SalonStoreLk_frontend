@@ -5,6 +5,7 @@ import "./globals.css";
 import { MuiThemeProvider } from "@/context/MuiThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import StoreProvider from "@/lib/store/StoreProvider";
+import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
             </AuthProvider>
           </MuiThemeProvider>
         </StoreProvider>
+        <Toaster />
       </body>
     </html>
   );

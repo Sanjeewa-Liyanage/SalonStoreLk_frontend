@@ -35,48 +35,8 @@ import { useMuiTheme } from '@/context/MuiThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
-const NOTIFICATIONS = [
-  {
-    id: 1,
-    text: 'New salon registration pending approval',
-    time: '2m ago',
-    unread: true,
-    type: 'salon',
-    color: '#6366f1',
-  },
-  {
-    id: 2,
-    text: 'User reported a feedback on Glamour Studio',
-    time: '18m ago',
-    unread: true,
-    type: 'feedback',
-    color: '#f59e0b',
-  },
-  {
-    id: 3,
-    text: 'Advertisement #AD-041 has expired',
-    time: '1h ago',
-    unread: true,
-    type: 'ad',
-    color: '#ef4444',
-  },
-  {
-    id: 4,
-    text: 'Monthly report is ready to download',
-    time: '3h ago',
-    unread: false,
-    type: 'report',
-    color: '#10b981',
-  },
-  {
-    id: 5,
-    text: 'New user registered: dilnoza@gmail.com',
-    time: '5h ago',
-    unread: false,
-    type: 'user',
-    color: '#0ea5e9',
-  },
-];
+import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
+import { fetchNotifications } from '@/lib/store/slices/notificationSlice';
 
 interface HeaderProps {
   pageTitle?: string;
@@ -90,17 +50,18 @@ export default function HeaderAdmin({
   const { isDark, toggleTheme } = useMuiTheme();
   const { user, logout } = useAuth();
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { items: notifications, unreadCount } = useAppSelector((state) => state.notifications);
 
   const [search, setSearch] = useState('');
   const [notifAnchor, setNotifAnchor] = useState<null | HTMLElement>(null);
   const [userAnchor, setUserAnchor] = useState<null | HTMLElement>(null);
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
   const [notifFilter, setNotifFilter] = useState<'all' | 'unread'>('all');
-
-  const unreadCount = notifications.filter((n) => n.unread).length;
 
   const handleNotifClick = (event: React.MouseEvent<HTMLElement>) => {
     setNotifAnchor(event.currentTarget);
+    // Fetch notifications list when pane is opened
+    dispatch(fetchNotifications());
   };
 
   const handleNotifClose = () => {
@@ -131,12 +92,8 @@ export default function HeaderAdmin({
     router.push('/admin/settings');
   };
 
-  const markAllRead = () => {
-    setNotifications((n) => n.map((x) => ({ ...x, unread: false })));
-  };
-
   const filteredNotifications =
-    notifFilter === 'unread' ? notifications.filter((n) => n.unread) : notifications;
+    notifFilter === 'unread' ? notifications.filter((n: any) => n.status === 'UNREAD') : notifications;
 
   const displayName = user?.name || user?.firstName || user?.lastName
     ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Admin User'
@@ -361,9 +318,6 @@ export default function HeaderAdmin({
             >
               Unread
             </Button>
-            <Button size="small" onClick={markAllRead} variant="text">
-              Mark all read
-            </Button>
           </Stack>
         </Box>
 
@@ -391,12 +345,12 @@ export default function HeaderAdmin({
               />
             </ListItem>
           ) : (
-            filteredNotifications.map((notif, idx) => (
-              <React.Fragment key={notif.id}>
+            filteredNotifications.map((notif: any, idx: number) => (
+              <React.Fragment key={notif.id || idx}>
                 <ListItem
                   sx={{
                     py: 2,
-                    backgroundColor: notif.unread
+                    backgroundColor: notif.status === 'UNREAD'
                       ? isDark
                         ? 'rgba(167, 139, 250, 0.05)'
                         : '#fafbff'
@@ -412,18 +366,18 @@ export default function HeaderAdmin({
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      backgroundColor: notif.unread ? notif.color : isDark ? '#2a3050' : '#e2e8f0',
+                      backgroundColor: notif.status === 'UNREAD' ? '#6366f1' : isDark ? '#2a3050' : '#e2e8f0',
                       mr: 2,
                       flexShrink: 0,
                       mt: 0.3,
                     }}
                   />
                   <ListItemText
-                    primary={notif.text}
-                    secondary={notif.time}
+                    primary={notif.message || notif.title || 'Notification'}
+                    secondary={notif.createdAt ? new Date(notif.createdAt).toLocaleString() : notif.time || 'Just now'}
                     primaryTypographyProps={{
                       variant: 'body2',
-                      color: notif.unread
+                      color: notif.status === 'UNREAD'
                         ? isDark
                           ? '#f1f5f9'
                           : '#1a1d2e'

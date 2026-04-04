@@ -105,11 +105,11 @@ function normalizeSalon(rawSalon: any): Salon {
           ? rawSalon.reviewCount
           : 0,
     description: String(rawSalon?.description || rawSalon?.overview || "No description available."),
-            openingTime: rawSalon?.openingTime ? String(rawSalon.openingTime) : undefined,
-            closingTime: rawSalon?.closingTime ? String(rawSalon.closingTime) : undefined,
+    openingTime: rawSalon?.openingTime ? String(rawSalon.openingTime) : undefined,
+    closingTime: rawSalon?.closingTime ? String(rawSalon.closingTime) : undefined,
     services: normalizeServices(rawSalon?.services),
     gallery: safeGallery.length ? safeGallery : [primaryImage],
-            coordinates: hasCoordinates ? { latitude, longitude } : undefined,
+    coordinates: hasCoordinates ? { latitude, longitude } : undefined,
     contact: {
       phone: String(phone),
       whatsapp: String(whatsapp),
@@ -166,10 +166,10 @@ async function salonPatchRequest(params: Record<string, string>, accessToken: st
   delete requestParams.reason;
 
   const body = (params.action === 'suspend' || params.action === 'reject') && reason ? { reason } : {};
-  
+
   const query = new URLSearchParams(requestParams).toString();
   try {
-	const { data } = await axios.patch(`/api/salons?${query}`, body, {
+    const { data } = await axios.patch(`/api/salons?${query}`, body, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return data;
@@ -177,7 +177,7 @@ async function salonPatchRequest(params: Record<string, string>, accessToken: st
     if (error?.response?.status !== 401) throw error;
 
     const nextAccessToken = await refreshAccessToken();
-	const { data } = await axios.patch(`/api/salons?${query}`, body, {
+    const { data } = await axios.patch(`/api/salons?${query}`, body, {
       headers: { Authorization: `Bearer ${nextAccessToken}` },
     });
     return data;
@@ -194,8 +194,8 @@ export const fetchSuspendedSalons = (token: string, options?: SalonQueryOptions)
   salonRequest(buildSalonParams({ type: "suspended" }, options), token);
 export const fetchRejectedSalons = (token: string, options?: SalonQueryOptions) =>
   salonRequest(buildSalonParams({ type: "rejected" }, options), token);
-export const fetchSalonById    = (id: string, token: string) => salonRequest({ type: "by-id", id }, token);
-export const fetchByOwner      = (token: string) => salonRequest({ type: "by-owner" }, token);
+export const fetchSalonById = (id: string, token: string) => salonRequest({ type: "by-id", id }, token);
+export const fetchByOwner = (token: string) => salonRequest({ type: "by-owner" }, token);
 
 export async function getSalonById(id: string): Promise<Salon> {
   const token = typeof window !== "undefined" ? sessionStorage.getItem("accessToken") : null;
@@ -238,7 +238,7 @@ export const fetchSalonDetails = async (id: string, accessToken: string) => {
 
 export async function createSalon(salonData: any) {
   const token = sessionStorage.getItem("accessToken");
-  
+
   try {
     const { data } = await axios.post("/api/salons/create", salonData, {
       headers: { Authorization: `Bearer ${token}` },
@@ -246,7 +246,7 @@ export async function createSalon(salonData: any) {
     return data;
   } catch (error: any) {
     // If token expired (401), refresh and retry
-    if (error?.response?.status !== 401) throw error;
+    if (error?.response?.status !== 400) throw error;
 
     const nextAccessToken = await refreshAccessToken();
     const { data } = await axios.post("/api/salons/create", salonData, {
