@@ -7,6 +7,24 @@ interface NotificationState {
     loading: boolean;
 }
 
+function normalizeNotification(payload: any) {
+    if (!payload) return null;
+    const source = payload.notification || payload;
+    const id = source.id || payload.notificationId;
+    return id ? { ...source, id } : source;
+}
+
+function dedupeNotifications(items: any[]) {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+        const id = item?.id;
+        if (!id) return true;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+    });
+}
+
 const initialState: NotificationState = {
     items: [],
     unreadCount: 0,
@@ -37,8 +55,19 @@ const notificationSlice = createSlice({
             state.unreadCount = action.payload;
         },
         addNotification: (state, action: PayloadAction<any>) => {
-            state.items.unshift(action.payload);
-            state.unreadCount += 1;
+            const notification = normalizeNotification(action.payload);
+            if (!notification) return;
+
+            const exists = notification.id
+                ? state.items.some((item) => item.id === notification.id)
+                : false;
+
+            if (exists) return;
+
+            state.items.unshift(notification);
+            if (notification.status === 'UNREAD') {
+                state.unreadCount += 1;
+            }
         },
         markAsRead: (state, action: PayloadAction<string>) => {
             const notification = state.items.find((item) => item.id === action.payload);
@@ -60,9 +89,14 @@ const notificationSlice = createSlice({
                 const payloadArray = Array.isArray(action.payload) 
                     ? action.payload 
                     : action.payload?.data || action.payload?.notifications || action.payload?.content || [];
-                
-                state.items = payloadArray;
-                state.unreadCount = payloadArray.filter((notification: any) => notification.status === 'UNREAD').length;
+
+                const normalized = payloadArray
+                    .map((item: any) => normalizeNotification(item))
+                    .filter(Boolean);
+                const uniqueNotifications = dedupeNotifications(normalized);
+
+                state.items = uniqueNotifications;
+                state.unreadCount = uniqueNotifications.filter((notification: any) => notification.status === 'UNREAD').length;
             })
             .addCase(fetchNotifications.rejected, (state) => {
                 state.loading = false;

@@ -2,6 +2,13 @@ import axios from "axios";
 import { refreshAccessToken } from "./authService";
 
 type AdStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+type AdFilterType = "all" | "active" | "pending_approval" | "rejected";
+
+interface GetAllAdsParams {
+    page?: number;
+    limit?: number;
+    type?: AdFilterType;
+}
 
 function resolveAccessToken(accessToken?: string) {
     if (accessToken) return accessToken;
@@ -55,18 +62,34 @@ export async function getAdsBySalon(salonId: string, accessToken: string) {
     }
 }
 
-export async function getAllAds(accessToken?: string) {
-    const token = resolveAccessToken(accessToken);
+export async function getAllAds(paramsOrToken?: GetAllAdsParams | string, accessToken?: string) {
+    const params: GetAllAdsParams = typeof paramsOrToken === "string"
+        ? {}
+        : (paramsOrToken || {});
+    const tokenInput = typeof paramsOrToken === "string" ? paramsOrToken : accessToken;
+    const token = resolveAccessToken(tokenInput);
+
     if (!token) throw new Error("No access token found.");
+
+    const requestParams = {
+        page: params.page ?? 1,
+        limit: params.limit ?? 10,
+        type: params.type ?? "all",
+    };
+
     try {
         const headers = { Authorization: `Bearer ${token}` };
-        const { data } = await axios.get(`/api/ads/all`, { headers });
+        const { data } = await axios.get(`/api/ads/all`, {
+            headers,
+            params: requestParams,
+        });
         return data;
     } catch (error: any) {
         if (error?.response?.status !== 401) throw error;
         const nextAccessToken = await refreshAccessToken();
         const { data } = await axios.get(`/api/ads/all`, {
             headers: { Authorization: `Bearer ${nextAccessToken}` },
+            params: requestParams,
         });
         return data;
     }

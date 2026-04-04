@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, SyntheticEvent } from 'react';
+import { Suspense, useEffect, useMemo, useState, SyntheticEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Alert,
@@ -164,7 +164,7 @@ const UserTable = ({ users, isDark, onView, onSuspend, onReactive }: { users: Us
     );
 };
 
-export default function AdminUsersPage() {
+function AdminUsersPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const muiTheme = useTheme();
@@ -544,5 +544,27 @@ export default function AdminUsersPage() {
                 onClose={closeViewDialog}
             />
         </>
+    );
+}
+
+export default function AdminUsersPage() {
+    return (
+        <Suspense
+            fallback={
+                <Box
+                    sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: '100vh',
+                        backgroundColor: '#f9fafb',
+                    }}
+                >
+                    <SalonLoader />
+                </Box>
+            }
+        >
+            <AdminUsersPageContent />
+        </Suspense>
     );
 }

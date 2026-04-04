@@ -246,7 +246,7 @@ export async function createSalon(salonData: any) {
     return data;
   } catch (error: any) {
     // If token expired (401), refresh and retry
-    if (error?.response?.status !== 400) throw error;
+    if (error?.response?.status !== 401) throw error;
 
     const nextAccessToken = await refreshAccessToken();
     const { data } = await axios.post("/api/salons/create", salonData, {

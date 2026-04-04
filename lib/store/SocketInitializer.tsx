@@ -8,11 +8,13 @@ import { addNotification, fetchUnreadCount } from './slices/notificationSlice';
 import { toast } from '@/hooks/use-toast';
 
 const SOCKET_URL = 'https://salon-store-lk-prod-707068751976.asia-south1.run.app';
+const UNREAD_COUNT_POLL_INTERVAL_MS = 8 * 60 * 1000;
 
 export function SocketInitializer({ children }: { children: React.ReactNode }) {
     const dispatch = useAppDispatch();
     const { isAuthenticated } = useAppSelector((state) => state.auth);
     const socketRef = useRef<Socket | null>(null);
+    const processedNotificationIdsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         // Clean up any existing socket before creating a new one
@@ -25,6 +27,9 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
 
         // 1. Fetch initial unread count on login
         dispatch(fetchUnreadCount());
+        const unreadCountPollingId = window.setInterval(() => {
+            dispatch(fetchUnreadCount());
+        }, UNREAD_COUNT_POLL_INTERVAL_MS);
 
         const token = sessionStorage.getItem('accessToken');
         if (!token) return;
@@ -58,9 +63,27 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
             const systemEvents = ['authenticated', 'error', 'connect', 'disconnect', 'connect_error'];
             if (systemEvents.includes(eventName)) return;
 
-            // Extract the notification object from the payload
-            // Backend wraps notifications in a `notifications` array inside the event data
-            const notification = data?.notifications?.[0] || data;
+            // Normalize event payload because backend may return:
+            // { notification: {...}, notificationId }, { notifications: [...] }, or {...notification}
+            const notification = data?.notification || data?.notifications?.[0] || data;
+            const notificationId = notification?.id || data?.notificationId;
+
+            // Guard against duplicate socket emissions/reconnect replays.
+            if (notificationId && processedNotificationIdsRef.current.has(notificationId)) {
+                return;
+            }
+
+            if (notificationId) {
+                processedNotificationIdsRef.current.add(notificationId);
+
+                // Keep this set bounded in long sessions.
+                if (processedNotificationIdsRef.current.size > 500) {
+                    const oldestId = processedNotificationIdsRef.current.values().next().value;
+                    if (oldestId) {
+                        processedNotificationIdsRef.current.delete(oldestId);
+                    }
+                }
+            }
 
             // Update Redux state (badge count increments automatically)
             dispatch(addNotification(notification));
@@ -85,6 +108,8 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
         });
 
         return () => {
+            window.clearInterval(unreadCountPollingId);
+            socket.offAny();
             socket.disconnect();
             socketRef.current = null;
             console.log('🔌 Socket cleanup: disconnected');

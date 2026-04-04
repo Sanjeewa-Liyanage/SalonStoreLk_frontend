@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   Search,
   Bell,
@@ -15,6 +15,10 @@ import {
 import { useMuiTheme } from "@/context/MuiThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { fetchNotifications } from "@/lib/store/slices/notificationSlice";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,10 +36,38 @@ function getGreeting(): string {
   return "Good evening";
 }
 
+function formatNotificationTime(value?: string) {
+  if (!value) return "Just now";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Just now";
+
+  return date.toLocaleString();
+}
+
 export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean, setSidebarOpen: (open: boolean) => void }) {
   const { isDark, toggleTheme } = useMuiTheme();
   const { user, logout } = useAuth();
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { items: notifications, unreadCount } = useAppSelector((state) => state.notifications);
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
+
+  const filteredNotifications = useMemo(
+    () => (notifFilter === "unread"
+      ? notifications.filter((notif: any) => notif?.status === "UNREAD")
+      : notifications),
+    [notifFilter, notifications]
+  );
+
+  const handleNotifOpenChange = (open: boolean) => {
+    setNotifOpen(open);
+    if (open) {
+      dispatch(fetchNotifications());
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -92,10 +124,84 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
         </button>
 
         {/* Notifications */}
-        <button className="relative p-2 text-neutral-500 hover:bg-neutral-100 rounded-full transition-colors">
-          <Bell size={20} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
+        <Popover open={notifOpen} onOpenChange={handleNotifOpenChange}>
+          <PopoverTrigger asChild>
+            <button
+              className="relative p-2 text-neutral-500 hover:bg-neutral-100 rounded-full transition-colors"
+              title="Notifications"
+              aria-label="Open notifications"
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-500 text-white text-[10px] leading-5 rounded-full border-2 border-white font-semibold text-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            sideOffset={10}
+            className="w-88 p-0 border-neutral-200 bg-white text-black"
+          >
+            <div className="px-4 py-3 border-b border-neutral-200">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-black">Notifications</p>
+                <span className="text-xs font-medium text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full">
+                  {unreadCount} unread
+                </span>
+              </div>
+              <div className="mt-3 inline-flex rounded-md border border-neutral-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setNotifFilter("all")}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${notifFilter === "all" ? "bg-black text-white" : "bg-white text-neutral-600 hover:bg-neutral-50"}`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotifFilter("unread")}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-neutral-200 ${notifFilter === "unread" ? "bg-black text-white" : "bg-white text-neutral-600 hover:bg-neutral-50"}`}
+                >
+                  Unread
+                </button>
+              </div>
+            </div>
+
+            <ScrollArea className="h-80">
+              {filteredNotifications.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-neutral-500">
+                  No notifications yet.
+                </div>
+              ) : (
+                <div>
+                  {filteredNotifications.map((notif: any, index: number) => (
+                    <div
+                      key={notif?.id || index}
+                      className={`px-4 py-3 border-b border-neutral-100 ${notif?.status === "UNREAD" ? "bg-amber-50/50" : "bg-white"}`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className={`mt-1.5 h-2 w-2 rounded-full ${notif?.status === "UNREAD" ? "bg-amber-500" : "bg-neutral-300"}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-neutral-800 truncate">
+                            {notif?.title || "Notification"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-neutral-600 leading-relaxed">
+                            {notif?.message || "You have a new update."}
+                          </p>
+                          <p className="mt-1 text-[11px] text-neutral-400">
+                            {formatNotificationTime(notif?.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
 
         <div className="hidden md:block h-8 w-px bg-neutral-200 mx-2"></div>
 
