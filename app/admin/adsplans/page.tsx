@@ -1,6 +1,6 @@
 'use client';
 
-import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
+import { Suspense, type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
 	Alert,
@@ -222,7 +222,7 @@ const PlanTable = ({
 	);
 };
 
-export default function AdminAdsPlansPage() {
+function AdminAdsPlansPageContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const muiTheme = useTheme();
@@ -606,5 +606,27 @@ export default function AdminAdsPlansPage() {
 				onSubmit={handleCreateSubmit}
 			/>
 		</>
+	);
+}
+
+export default function AdminAdsPlansPage() {
+	return (
+		<Suspense
+			fallback={
+				<Box
+					sx={{
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						minHeight: '100vh',
+						backgroundColor: '#f9fafb',
+					}}
+				>
+					<SalonLoader />
+				</Box>
+			}
+		>
+			<AdminAdsPlansPageContent />
+		</Suspense>
 	);
 }

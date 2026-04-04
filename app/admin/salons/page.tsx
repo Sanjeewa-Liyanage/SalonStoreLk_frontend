@@ -1,6 +1,6 @@
 'use client';
 
-import { type SyntheticEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, type SyntheticEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
 	Alert,
@@ -354,7 +354,7 @@ const SalonTable = ({
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function AdminSalonsPage() {
+function AdminSalonsPageContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const muiTheme = useTheme();
@@ -1049,5 +1049,27 @@ export default function AdminSalonsPage() {
 				onClose={handleCloseViewDialog}
 			/>
 		</>
+	);
+}
+
+export default function AdminSalonsPage() {
+	return (
+		<Suspense
+			fallback={
+				<Box
+					sx={{
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						minHeight: '100vh',
+						backgroundColor: '#f9fafb',
+					}}
+				>
+					<SalonLoader />
+				</Box>
+			}
+		>
+			<AdminSalonsPageContent />
+		</Suspense>
 	);
 }

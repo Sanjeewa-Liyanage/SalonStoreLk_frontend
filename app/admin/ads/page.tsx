@@ -1,6 +1,6 @@
 'use client';
 
-import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
+import { Suspense, type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
 	Alert,
@@ -55,10 +55,32 @@ interface Ad {
 	rejectionReason?: string;
 }
 
-type AdTab = 'all' | 'active' | 'pending' | 'rejected';
+type AdTab = 'all' | 'active' | 'pending_approval' | 'rejected';
+
+interface AdsPagination {
+	page: number;
+	limit: number;
+	totalItems: number;
+	totalPages: number;
+	hasPrevious: boolean;
+	hasNext: boolean;
+}
+
+interface AdsListResponse {
+	data?: Ad[];
+	pagination?: Partial<AdsPagination>;
+}
+
+interface AdsSummaryCounts {
+	total: number;
+	active: number;
+	pending: number;
+	rejected: number;
+}
 
 const normalizeAdTab = (value: string | null): AdTab => {
-	if (value === 'active' || value === 'pending' || value === 'all' || value === 'rejected') return value;
+	if (value === 'pending') return 'pending_approval';
+	if (value === 'active' || value === 'pending_approval' || value === 'all' || value === 'rejected') return value;
 	return 'all';
 };
 
@@ -179,7 +201,7 @@ const AdTable = ({
 							{showActions && (
 								<Box component="td" sx={cellSx()}>
 									<Stack direction="row" spacing={1}>
-										{currentTab === 'pending' && (
+										{currentTab === 'pending_approval' && (
 											<>
 												<Button
 													size="small"
@@ -215,15 +237,31 @@ const AdTable = ({
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function AdminAdsPage() {
+function AdminAdsPageContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const muiTheme = useTheme();
 	const { isDark } = useMuiTheme();
 	const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
 
-	// ── Single source of truth: all ads fetched once ──
-	const [allAds, setAllAds] = useState<Ad[]>([]);
+	const rowsPerPage = 10;
+
+	// ── Server-driven data state ──
+	const [ads, setAds] = useState<Ad[]>([]);
+	const [pagination, setPagination] = useState<AdsPagination>({
+		page: 1,
+		limit: rowsPerPage,
+		totalItems: 0,
+		totalPages: 1,
+		hasPrevious: false,
+		hasNext: false,
+	});
+	const [counts, setCounts] = useState<AdsSummaryCounts>({
+		total: 0,
+		active: 0,
+		pending: 0,
+		rejected: 0,
+	});
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 
@@ -236,32 +274,104 @@ export default function AdminAdsPage() {
 	const [rejectReason, setRejectReason] = useState('');
 	const [viewAdId, setViewAdId] = useState<string | null>(null);
 
-	const rowsPerPage = 10;
 	const activeTab = normalizeAdTab(searchParams.get('status'));
 
-	// ── Fetch ONCE on mount — no tab dependency ──
+	const resolveAccessToken = () => {
+		const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
+		if (!token) throw new Error('No access token found. Please login again.');
+		return token;
+	};
+
+	const applyAdsResponse = (payload: AdsListResponse, requestedPage: number) => {
+		const adsData = Array.isArray(payload?.data) ? payload.data : [];
+		const paginationData = payload?.pagination;
+
+		setAds(adsData);
+		setPagination({
+			page: paginationData?.page ?? requestedPage,
+			limit: paginationData?.limit ?? rowsPerPage,
+			totalItems: paginationData?.totalItems ?? adsData.length,
+			totalPages: Math.max(1, paginationData?.totalPages ?? 1),
+			hasPrevious: Boolean(paginationData?.hasPrevious),
+			hasNext: Boolean(paginationData?.hasNext),
+		});
+	};
+
+	const refreshSummaryCounts = async (token: string, commit = true) => {
+		const [allResponse, activeResponse, pendingResponse, rejectedResponse] = await Promise.all([
+			getAllAds({ page: 1, limit: 1, type: 'all' }, token),
+			getAllAds({ page: 1, limit: 1, type: 'active' }, token),
+			getAllAds({ page: 1, limit: 1, type: 'pending_approval' }, token),
+			getAllAds({ page: 1, limit: 1, type: 'rejected' }, token),
+		]);
+
+		const nextCounts: AdsSummaryCounts = {
+			total: allResponse?.pagination?.totalItems ?? 0,
+			active: activeResponse?.pagination?.totalItems ?? 0,
+			pending: pendingResponse?.pagination?.totalItems ?? 0,
+			rejected: rejectedResponse?.pagination?.totalItems ?? 0,
+		};
+
+		if (commit) {
+			setCounts(nextCounts);
+		}
+
+		return nextCounts;
+	};
+
+	// ── Load tab data from backend by type + page ──
 	useEffect(() => {
+		let isMounted = true;
+
 		const loadAds = async () => {
 			setLoading(true);
 			setError('');
 			try {
-				const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
-				if (!token) throw new Error('No access token found. Please login again.');
-
-				const payload = await getAllAds(token); // Get all ads with auth
-				// Response is always { data: [...], total: ... }
-				const adsData = Array.isArray(payload?.data) ? payload.data : [];
-				setAllAds(adsData);
+				const token = resolveAccessToken();
+				const payload = (await getAllAds({ page, limit: rowsPerPage, type: activeTab }, token)) as AdsListResponse;
+				if (!isMounted) return;
+				applyAdsResponse(payload, page);
 			} catch (fetchError) {
+				if (!isMounted) return;
 				console.error('Error loading ads:', fetchError);
 				setError(fetchError instanceof Error ? fetchError.message : 'Something went wrong');
 			} finally {
-				setLoading(false);
+				if (isMounted) {
+					setLoading(false);
+				}
 			}
 		};
 
 		loadAds();
-	}, []); // ← empty array: runs once only
+
+		return () => {
+			isMounted = false;
+		};
+	}, [activeTab, page]);
+
+	// ── Load summary totals for cards ──
+	useEffect(() => {
+		let isMounted = true;
+
+		const loadSummary = async () => {
+			try {
+				const token = resolveAccessToken();
+				const nextCounts = await refreshSummaryCounts(token, false);
+
+				if (!isMounted) return;
+				setCounts(nextCounts);
+			} catch (summaryError) {
+				if (!isMounted) return;
+				console.error('Error loading ad summary:', summaryError);
+			}
+		};
+
+		loadSummary();
+
+		return () => {
+			isMounted = false;
+		};
+	}, []);
 
 	// ── Reset search + page when tab changes ──
 	useEffect(() => {
@@ -269,62 +379,21 @@ export default function AdminAdsPage() {
 		setPage(1);
 	}, [activeTab]);
 
-	// ── Derive filtered lists from allAds ──
-	const activeAds = useMemo(
-		() => allAds.filter((ad) => ad.status.toUpperCase() === 'APPROVED'),
-		[allAds]
-	);
-
-	const pendingAds = useMemo(
-		() => allAds.filter((ad) => ad.status.toUpperCase() === 'PENDING_APPROVAL'),
-		[allAds]
-	);
-
-	const rejectedAds = useMemo(
-		() => allAds.filter((ad) => ad.status.toUpperCase() === 'REJECTED'),
-		[allAds]
-	);
-
-	// ── Summary counts (always derived from allAds) ──
-	const counts = useMemo(
-		() => ({
-			total: allAds.length,
-			active: activeAds.length,
-			pending: pendingAds.length,
-			rejected: rejectedAds.length,
-		}),
-		[allAds, activeAds, pendingAds, rejectedAds]
-	);
-
-	// ── Pick the correct list for the active tab ──
-	const currentList = useMemo(() => {
-		switch (activeTab) {
-			case 'active':
-				return activeAds;
-			case 'pending':
-				return pendingAds;
-			case 'rejected':
-				return rejectedAds;
-			default:
-				return allAds;
-		}
-	}, [activeTab, allAds, activeAds, pendingAds, rejectedAds]);
-
-	// ── Apply search filter on top of the current list ──
+	// ── Apply search filter on current backend page results ──
 	const filteredList = useMemo(() => {
 		const query = search.toLowerCase().trim();
-		if (!query) return currentList;
-		return currentList.filter(
+		if (!query) return ads;
+		return ads.filter(
 			(ad) =>
 				ad.title.toLowerCase().includes(query) ||
 				(ad.salonName || '').toLowerCase().includes(query) ||
 				ad.description.toLowerCase().includes(query)
 		);
-	}, [currentList, search]);
+	}, [ads, search]);
 
 	// ── Pagination ──
-	const totalPages = Math.max(1, Math.ceil(filteredList.length / rowsPerPage));
-	const paginatedList = filteredList.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+	const totalPages = Math.max(1, pagination.totalPages);
+	const activeTabLabel = activeTab === 'pending_approval' ? 'pending approval' : activeTab;
 
 	// ── Tab change ──
 	const handleTabChange = (_: SyntheticEvent, value: AdTab) => {
@@ -337,15 +406,12 @@ export default function AdminAdsPage() {
 		try {
 			setProcessingId(adId);
 			setActionError(null);
-			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
-			if (!token) throw new Error('No access token found.');
+			const token = resolveAccessToken();
 
 			await approveAd(adId);
-
-			// Optimistically update local state
-			setAllAds((prev) =>
-				prev.map((ad) => (ad.id === adId ? { ...ad, status: 'APPROVED' } : ad))
-			);
+			const payload = (await getAllAds({ page, limit: rowsPerPage, type: activeTab }, token)) as AdsListResponse;
+			applyAdsResponse(payload, page);
+			await refreshSummaryCounts(token);
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to approve ad.');
 		} finally {
@@ -358,14 +424,12 @@ export default function AdminAdsPage() {
 		try {
 			setProcessingId(adId);
 			setActionError(null);
-			const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
-			if (!token) throw new Error('No access token found.');
+			const token = resolveAccessToken();
 
 			await rejectAd(adId, rejectReason.trim() || 'Rejected by admin');
-
-			setAllAds((prev) =>
-				prev.map((ad) => (ad.id === adId ? { ...ad, status: 'REJECTED' } : ad))
-			);
+			const payload = (await getAllAds({ page, limit: rowsPerPage, type: activeTab }, token)) as AdsListResponse;
+			applyAdsResponse(payload, page);
+			await refreshSummaryCounts(token);
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : 'Failed to reject ad.');
 		} finally {
@@ -390,8 +454,8 @@ export default function AdminAdsPage() {
 	};
 
 	const rejectTargetAd = useMemo(
-		() => allAds.find((ad) => ad.id === rejectConfirmState),
-		[allAds, rejectConfirmState]
+		() => ads.find((ad) => ad.id === rejectConfirmState),
+		[ads, rejectConfirmState]
 	);
 
 	if (loading) {
@@ -492,14 +556,14 @@ export default function AdminAdsPage() {
 											onChange={handleTabChange}
 											sx={{ '& .MuiTabs-indicator': { backgroundColor: '#a78bfa' } }}
 										>
-											{(['all', 'active', 'pending', 'rejected'] as AdTab[]).map((tab) => (
+											{(['all', 'active', 'pending_approval', 'rejected'] as AdTab[]).map((tab) => (
 												<Tab
 													key={tab}
 													value={tab}
 													label={
 														tab === 'all'       ? 'All Ads' :
 														tab === 'active'    ? 'Active Ads' :
-														tab === 'pending'   ? 'Pending Approval' :
+														tab === 'pending_approval'   ? 'Pending Approval' :
 														'Rejected Ads'
 
 													}
@@ -515,10 +579,7 @@ export default function AdminAdsPage() {
 											<TextField
 												placeholder="Search by title, salon name, or description"
 												value={search}
-												onChange={(e) => {
-													setSearch(e.target.value);
-													setPage(1);
-												}}
+												onChange={(e) => setSearch(e.target.value)}
 												size="small"
 												fullWidth
 												InputProps={{
@@ -540,18 +601,18 @@ export default function AdminAdsPage() {
 											{error       && <Alert severity="error">{error}</Alert>}
 											{actionError && <Alert severity="error">{actionError}</Alert>}
 
-											{paginatedList.length === 0 ? (
+											{filteredList.length === 0 ? (
 												<Alert severity="info">
 													{filteredList.length === 0 && search
 														? 'No ads found for your search.'
-														: `No ${activeTab === 'all' ? '' : activeTab + ' '}ads found.`}
+														: `No ${activeTab === 'all' ? '' : activeTabLabel + ' '}ads found.`}
 												</Alert>
 											) : (
 												<AdTable
-													ads={paginatedList}
+													ads={filteredList}
 													isDark={isDark}
 													currentTab={activeTab}
-													showActions={activeTab === 'pending'}
+													showActions={activeTab === 'pending_approval'}
 													processingId={processingId}
 													onApprove={handleApprove}
 													onReject={requestReject}
@@ -616,5 +677,27 @@ export default function AdminAdsPage() {
 				loading={processingId === rejectConfirmState}
 			/>
 		</>
+	);
+}
+
+export default function AdminAdsPage() {
+	return (
+		<Suspense
+			fallback={
+				<Box
+					sx={{
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						minHeight: '100vh',
+						backgroundColor: '#f9fafb',
+					}}
+				>
+					<SalonLoader />
+				</Box>
+			}
+		>
+			<AdminAdsPageContent />
+		</Suspense>
 	);
 }

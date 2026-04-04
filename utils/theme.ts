@@ -1,4 +1,5 @@
 import { createTheme, ThemeOptions } from '@mui/material/styles';
+import type {} from '@mui/x-data-grid/themeAugmentation';
 
 export const getLightTheme = (): ThemeOptions => ({
   palette: {
