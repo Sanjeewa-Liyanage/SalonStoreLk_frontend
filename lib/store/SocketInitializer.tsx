@@ -5,8 +5,6 @@ import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAppDispatch, useAppSelector } from './hooks';
 import { addNotification, fetchUnreadCount } from './slices/notificationSlice';
-// Import the standalone toast function (NOT the hook) from the same module
-// that the <Toaster /> component reads from — @/hooks/use-toast
 import { toast } from '@/hooks/use-toast';
 
 const SOCKET_URL = 'https://salon-store-lk-prod-707068751976.asia-south1.run.app';
@@ -31,10 +29,10 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
         const token = sessionStorage.getItem('accessToken');
         if (!token) return;
 
-        // 2. Initialize Socket Connection
+        // 2. Initialize Socket Connection — EXACTLY matching the working playground tester config
         const socket = io(SOCKET_URL, {
             auth: { token: token },
-            transports: ['websocket'],
+            transports: ['websocket', 'polling'], // Match tester: both transports
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
@@ -43,40 +41,35 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            console.log(`✅ Socket connected successfully. ID: ${socket.id}`);
+            console.log(`✅ Socket connected. ID: ${socket.id}, transport: ${socket.io.engine.transport.name}`);
         });
 
-        // 3. Listen to all backend notification event types
-        const notificationEvents = [
-            'salon-created',
-            'ad-created',
-            'ad-submitted',
-            'user-registered',
-            'notification',
-        ];
-
-        notificationEvents.forEach(eventName => {
-            socket.on(eventName, (newNotification: any) => {
-                console.log(`🚀 Real-time notification received [${eventName}]:`, newNotification);
-
-                // Update Redux state (badge count increments automatically)
-                dispatch(addNotification(newNotification));
-
-                // Show toast using the standalone function
-                toast({
-                    title: newNotification.title || eventName.replace(/-/g, ' ').toUpperCase(),
-                    description: newNotification.message || 'You received a new update.',
-                });
-            });
-        });
-
-        // Log EVERY event from the server — no filtering
-        socket.onAny((eventName, ...args) => {
-            console.log(`📡 [Socket.io] Event received: '${eventName}'`, args);
-        });
-
+        // Server confirms auth
         socket.on('authenticated', (data: any) => {
-            console.log(`🔑 Socket authenticated: ${data.role} (userId: ${data.userId})`);
+            console.log(`🔑 Authenticated as ${data.role} (userId: ${data.userId})`);
+        });
+
+        // 3. Catch-all: dispatch notifications for ANY event from the server
+        // This ensures we never miss an event regardless of its name
+        socket.onAny((eventName: string, data: any) => {
+            console.log(`📡 [Socket.io] Event: '${eventName}'`, data);
+
+            // Skip system events — only process notification-type events
+            const systemEvents = ['authenticated', 'error', 'connect', 'disconnect', 'connect_error'];
+            if (systemEvents.includes(eventName)) return;
+
+            // Extract the notification object from the payload
+            // Backend wraps notifications in a `notifications` array inside the event data
+            const notification = data?.notifications?.[0] || data;
+
+            // Update Redux state (badge count increments automatically)
+            dispatch(addNotification(notification));
+
+            // Show toast
+            toast({
+                title: notification.title || eventName.replace(/-/g, ' ').toUpperCase(),
+                description: notification.message || data?.message || 'You received a new update.',
+            });
         });
 
         socket.on('error', (err: any) => {
