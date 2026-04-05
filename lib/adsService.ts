@@ -165,9 +165,10 @@ export async function rejectAd(adId: string, reason: string) {
     }
 }
 export async function getByPriority(page = 1, limit = 10) {
-    return axios.get("/api/ads/by-priority", {
+    const { data } = await axios.get("/api/ads/by-priority", {
         params: { page, limit },
     });
+    return data;
 }
 
 export async function getAdDetails(adId: string) {

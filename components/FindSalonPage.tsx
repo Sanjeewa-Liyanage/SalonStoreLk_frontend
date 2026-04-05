@@ -33,8 +33,11 @@ type AdDto = {
 type GenericPagination = {
   page?: number;
   currentPage?: number;
+  limit?: number;
   totalPages?: number;
   totalItems?: number;
+  hasNextPage?: boolean;
+  hasPreviousPage?: boolean;
 };
 
 type PagedResponse<T> = {
@@ -48,6 +51,7 @@ interface FindSalonPageProps {
 }
 
 const SALONS_PER_PAGE = 10;
+const ADS_PER_PAGE = 10;
 
 const PLACEHOLDER_IMG =
   'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1200&q=70';
@@ -152,45 +156,80 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
   const [ads, setAds] = useState<AdDto[]>([]);
   const [salonPage, setSalonPage] = useState(1);
   const [salonTotalPages, setSalonTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [adPage, setAdPage] = useState(1);
+  const [adTotalPages, setAdTotalPages] = useState(1);
+  const [isSalonLoading, setIsSalonLoading] = useState(true);
+  const [isAdsLoading, setIsAdsLoading] = useState(true);
+  const [salonError, setSalonError] = useState<string | null>(null);
+  const [adsError, setAdsError] = useState<string | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadData() {
-      setIsLoading(true);
-      setError(null);
+    async function loadSalons() {
+      setIsSalonLoading(true);
+      setSalonError(null);
 
       try {
-        const [salonRes, adsRes] = await Promise.all([
-          getByPrority(salonPage, SALONS_PER_PAGE),
-          getAdsByPriority(1, 10),
-        ]);
+        const salonRes = await getByPrority(salonPage, SALONS_PER_PAGE);
 
         if (!isMounted) return;
 
         const salonPayload = (salonRes.data ?? {}) as PagedResponse<SalonDto>;
-        const adPayload = (adsRes.data ?? {}) as PagedResponse<AdDto>;
 
         setSalons(Array.isArray(salonPayload.data) ? salonPayload.data : []);
-        setAds(Array.isArray(adPayload.data) ? adPayload.data : []);
         setSalonTotalPages(Math.max(1, salonPayload.pagination?.totalPages ?? 1));
       } catch (err: any) {
         if (!isMounted) return;
-        setError(err?.response?.data?.message || 'Failed to load salon and ad data.');
+        setSalonError(err?.response?.data?.message || 'Failed to load salon data.');
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) setIsSalonLoading(false);
       }
     }
 
-    loadData();
+    loadSalons();
 
     return () => {
       isMounted = false;
     };
   }, [salonPage]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAds() {
+      setIsAdsLoading(true);
+      setAdsError(null);
+
+      try {
+        const adPayload = (await getAdsByPriority(adPage, ADS_PER_PAGE)) as PagedResponse<AdDto>;
+
+        if (!isMounted) return;
+
+        const nextCurrentPage = Math.max(1, adPayload.pagination?.currentPage ?? adPage);
+        const nextTotalPages = Math.max(1, adPayload.pagination?.totalPages ?? 1);
+
+        setAds(Array.isArray(adPayload.data) ? adPayload.data : []);
+        setAdTotalPages(nextTotalPages);
+
+        if (nextCurrentPage !== adPage) {
+          setAdPage(nextCurrentPage);
+        }
+      } catch (err: any) {
+        if (!isMounted) return;
+        setAdsError(err?.response?.data?.message || 'Failed to load featured offers.');
+      } finally {
+        if (isMounted) setIsAdsLoading(false);
+      }
+    }
+
+    loadAds();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [adPage]);
 
   const showingLabel = useMemo(() => {
     const from = (salonPage - 1) * SALONS_PER_PAGE + 1;
@@ -209,6 +248,18 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
     for (let p = start; p <= end; p += 1) pages.push(p);
     return pages;
   }, [salonPage, salonTotalPages]);
+
+  const canGoAdPrev = adPage > 1;
+  const canGoAdNext = adPage < adTotalPages;
+
+  const adPageNumbers = useMemo(() => {
+    const pages: number[] = [];
+    const maxWindow = 5;
+    const start = Math.max(1, adPage - 2);
+    const end = Math.min(adTotalPages, start + maxWindow - 1);
+    for (let p = start; p <= end; p += 1) pages.push(p);
+    return pages;
+  }, [adPage, adTotalPages]);
 
   const scrollCarousel = (direction: 'left' | 'right') => {
     const node = carouselRef.current;
@@ -240,12 +291,12 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-          {isLoading ? (
+          {isSalonLoading ? (
             <div className="flex h-56 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-[#d4a017]" />
             </div>
-          ) : error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</div>
+          ) : salonError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">{salonError}</div>
           ) : (
             <>
               <div className="mb-3 flex items-center justify-between">
@@ -346,63 +397,116 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
       </section>
 
       <section className="mx-auto mt-10 w-full max-w-screen-2xl px-3 md:px-5">
-        <h2 className="text-3xl font-bold tracking-tight text-black">Featured Offers</h2>
-        <p className="mt-1 text-sm text-black/55">Scroll to explore amazing deals and services</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-black">Featured Offers</h2>
+            <p className="mt-1 text-sm text-black/55">Scroll to explore amazing deals and services</p>
+          </div>
+          <p className="text-xs font-medium text-black/55">Page {adPage} of {adTotalPages}</p>
+        </div>
 
         <div className="mt-5 space-y-4">
-          {ads.map((ad) => (
-            <article
-              key={ad.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onAdSelect?.(ad.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  onAdSelect?.(ad.id);
-                }
-              }}
-              className="cursor-pointer overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm"
-            >
-              <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-black">{ad.salonName || 'SalonStore Partner'}</p>
-                  <p className="text-xs text-black/45">{formatPostDate(ad.createdAt)}</p>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-[#d4a017]/15 px-2.5 py-1 text-[11px] font-semibold text-[#8a6700]">
-                  Sponsored
-                </span>
-              </div>
+          {isAdsLoading ? (
+            <div className="flex h-40 items-center justify-center rounded-2xl border border-black/10 bg-white">
+              <Loader2 className="h-7 w-7 animate-spin text-[#d4a017]" />
+            </div>
+          ) : adsError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">{adsError}</div>
+          ) : (
+            <>
+              {ads.map((ad) => (
+                <article
+                  key={ad.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onAdSelect?.(ad.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onAdSelect?.(ad.id);
+                    }
+                  }}
+                  className="cursor-pointer overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm"
+                >
+                  <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-black">{ad.salonName || 'SalonStore Partner'}</p>
+                      <p className="text-xs text-black/45">{formatPostDate(ad.createdAt)}</p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-[#d4a017]/15 px-2.5 py-1 text-[11px] font-semibold text-[#8a6700]">
+                      Sponsored
+                    </span>
+                  </div>
 
-              <div className="space-y-3 p-4">
-                <h3 className="text-base font-semibold text-black">{ad.title}</h3>
-                <p className="line-clamp-4 text-sm leading-relaxed text-black/70">{ad.description || 'Exclusive promotion from our salon partner.'}</p>
-                <AdImageLayout images={Array.isArray(ad.imageUrl) ? ad.imageUrl : []} title={ad.title} />
-              </div>
+                  <div className="space-y-3 p-4">
+                    <h3 className="text-base font-semibold text-black">{ad.title}</h3>
+                    <p className="line-clamp-4 text-sm leading-relaxed text-black/70">{ad.description || 'Exclusive promotion from our salon partner.'}</p>
+                    <AdImageLayout images={Array.isArray(ad.imageUrl) ? ad.imageUrl : []} title={ad.title} />
+                  </div>
 
-              <div className="flex items-center justify-between border-t border-black/5 px-4 py-3">
-                <div className="inline-flex items-center gap-1 text-xs text-black/50">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Available islandwide
+                  <div className="flex items-center justify-between border-t border-black/5 px-4 py-3">
+                    <div className="inline-flex items-center gap-1 text-xs text-black/50">
+                      <MapPin className="h-3.5 w-3.5" />
+                      Available islandwide
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onAdSelect?.(ad.id);
+                      }}
+                      className="rounded-md bg-[#d4a017] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c79614]"
+                    >
+                      Learn More
+                    </button>
+                  </div>
+                </article>
+              ))}
+
+              {ads.length === 0 && (
+                <div className="rounded-2xl border border-black/10 bg-white p-6 text-center text-sm text-black/60">
+                  No active offers available at the moment.
                 </div>
+
+              )}
+
+              <div className="flex items-center justify-center gap-1.5 pt-2">
                 <button
                   type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAdSelect?.(ad.id);
-                  }}
-                  className="rounded-md bg-[#d4a017] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c79614]"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-black/20 text-black/70 disabled:cursor-not-allowed disabled:opacity-45"
+                  onClick={() => canGoAdPrev && setAdPage((p) => p - 1)}
+                  disabled={!canGoAdPrev}
+                  aria-label="Previous offers page"
                 >
-                  Learn More
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                {adPageNumbers.map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    className={`h-7 min-w-7 rounded-md px-2 text-xs font-semibold ${
+                      pageNum === adPage
+                        ? 'bg-[#1f5eff] text-white'
+                        : 'border border-black/20 bg-white text-black/70 hover:bg-black/5'
+                    }`}
+                    type="button"
+                    onClick={() => setAdPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-black/20 text-black/70 disabled:cursor-not-allowed disabled:opacity-45"
+                  onClick={() => canGoAdNext && setAdPage((p) => p + 1)}
+                  disabled={!canGoAdNext}
+                  aria-label="Next offers page"
+                >
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-            </article>
-          ))}
-
-          {!isLoading && !error && ads.length === 0 && (
-            <div className="rounded-2xl border border-black/10 bg-white p-6 text-center text-sm text-black/60">
-              No active offers available at the moment.
-            </div>
+            </>
           )}
         </div>
       </section>
