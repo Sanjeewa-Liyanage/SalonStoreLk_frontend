@@ -36,7 +36,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
-import { fetchNotifications } from '@/lib/store/slices/notificationSlice';
+import { fetchNotifications, markAllAsRead, markAllNotificationsRead, markAsRead, markNotificationRead } from '@/lib/store/slices/notificationSlice';
 
 interface HeaderProps {
   pageTitle?: string;
@@ -94,6 +94,21 @@ export default function HeaderAdmin({
 
   const filteredNotifications =
     notifFilter === 'unread' ? notifications.filter((n: any) => n.status === 'UNREAD') : notifications;
+
+  const handleNotificationItemClick = (notification: any) => {
+    const notificationId = notification?.id;
+    if (!notificationId || notification?.status !== 'UNREAD') return;
+
+    dispatch(markAsRead(notificationId));
+    void dispatch(markNotificationRead(notificationId));
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    if (unreadCount <= 0) return;
+
+    dispatch(markAllAsRead());
+    void dispatch(markAllNotificationsRead());
+  };
 
   const displayName = user?.name || user?.firstName || user?.lastName
     ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Admin User'
@@ -283,6 +298,7 @@ export default function HeaderAdmin({
           sx: {
             width: 360,
             maxHeight: 500,
+            overflowY: 'hidden',
             mt: 1,
             borderRadius: '16px',
             backgroundColor: isDark ? '#141828' : '#ffffff',
@@ -296,12 +312,22 @@ export default function HeaderAdmin({
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Notifications
             </Typography>
-            <Chip
-              label={`${unreadCount} Unread`}
-              size="small"
-              color="primary"
-              variant="outlined"
-            />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Chip
+                label={`${unreadCount} Unread`}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
+              <Button
+                size="small"
+                variant="text"
+                disabled={unreadCount <= 0}
+                onClick={handleMarkAllNotificationsRead}
+              >
+                Mark all as read
+              </Button>
+            </Stack>
           </Stack>
           <Stack direction="row" spacing={1}>
             <Button
@@ -325,15 +351,10 @@ export default function HeaderAdmin({
           sx={{
             maxHeight: 300,
             overflow: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
             '&::-webkit-scrollbar': {
-              width: '6px',
-            },
-            '&::-webkit-scrollbar-track': {
-              background: isDark ? '#0d0f1a' : '#f7f9ff',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              background: isDark ? '#1e2440' : '#eaecf5',
-              borderRadius: '3px',
+              display: 'none',
             },
           }}
         >
@@ -348,8 +369,10 @@ export default function HeaderAdmin({
             filteredNotifications.map((notif: any, idx: number) => (
               <React.Fragment key={notif.id || idx}>
                 <ListItem
+                  onClick={() => handleNotificationItemClick(notif)}
                   sx={{
                     py: 2,
+                    cursor: notif.status === 'UNREAD' ? 'pointer' : 'default',
                     backgroundColor: notif.status === 'UNREAD'
                       ? isDark
                         ? 'rgba(167, 139, 250, 0.05)'
