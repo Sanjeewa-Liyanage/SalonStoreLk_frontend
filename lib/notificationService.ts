@@ -46,3 +46,43 @@ export async function getUnreadNotificationCount(accessToken?: string) {
         return data;
     }
 }
+
+export async function markNotificationAsRead(notificationId: string, accessToken?: string) {
+    const token = resolveAccessToken(accessToken);
+    if (!token) throw new Error("No access token found.");
+
+    try {
+        const { data } = await axios.patch(`/api/notifications/${notificationId}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return data;
+    } catch (error: any) {
+        if (error?.response?.status !== 401) throw error;
+
+        const nextAccessToken = await refreshAccessToken();
+        const { data } = await axios.patch(`/api/notifications/${notificationId}/read`, {}, {
+            headers: { Authorization: `Bearer ${nextAccessToken}` },
+        });
+        return data;
+    }
+}
+
+export async function markAllNotificationsAsRead(accessToken?: string) {
+    const token = resolveAccessToken(accessToken);
+    if (!token) throw new Error("No access token found.");
+
+    try {
+        const { data } = await axios.patch("/api/notifications/read-all", {}, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return data;
+    } catch (error: any) {
+        if (error?.response?.status !== 401) throw error;
+
+        const nextAccessToken = await refreshAccessToken();
+        const { data } = await axios.patch("/api/notifications/read-all", {}, {
+            headers: { Authorization: `Bearer ${nextAccessToken}` },
+        });
+        return data;
+    }
+}

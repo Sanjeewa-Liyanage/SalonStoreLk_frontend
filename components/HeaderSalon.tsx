@@ -16,7 +16,7 @@ import { useMuiTheme } from "@/context/MuiThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
-import { fetchNotifications } from "@/lib/store/slices/notificationSlice";
+import { fetchNotifications, markAllAsRead, markAllNotificationsRead, markAsRead, markNotificationRead } from "@/lib/store/slices/notificationSlice";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -67,6 +67,21 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
     if (open) {
       dispatch(fetchNotifications());
     }
+  };
+
+  const handleNotificationItemClick = (notification: any) => {
+    const notificationId = notification?.id;
+    if (!notificationId || notification?.status !== "UNREAD") return;
+
+    dispatch(markAsRead(notificationId));
+    void dispatch(markNotificationRead(notificationId));
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    if (unreadCount <= 0) return;
+
+    dispatch(markAllAsRead());
+    void dispatch(markAllNotificationsRead());
   };
 
   const handleLogout = () => {
@@ -147,9 +162,19 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
             <div className="px-4 py-3 border-b border-neutral-200">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-black">Notifications</p>
-                <span className="text-xs font-medium text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full">
-                  {unreadCount} unread
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full">
+                    {unreadCount} unread
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleMarkAllNotificationsRead}
+                    disabled={unreadCount <= 0}
+                    className="text-xs font-medium text-neutral-700 hover:text-black disabled:text-neutral-400 disabled:cursor-not-allowed"
+                  >
+                    Mark all as read
+                  </button>
+                </div>
               </div>
               <div className="mt-3 inline-flex rounded-md border border-neutral-200 overflow-hidden">
                 <button
@@ -169,7 +194,7 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
               </div>
             </div>
 
-            <ScrollArea className="h-80">
+            <ScrollArea className="h-80 [&>[data-slot=scroll-area-scrollbar]]:hidden">
               {filteredNotifications.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-neutral-500">
                   No notifications yet.
@@ -179,7 +204,8 @@ export default function HeaderSalon({ sidebarOpen, setSidebarOpen }: { sidebarOp
                   {filteredNotifications.map((notif: any, index: number) => (
                     <div
                       key={notif?.id || index}
-                      className={`px-4 py-3 border-b border-neutral-100 ${notif?.status === "UNREAD" ? "bg-amber-50/50" : "bg-white"}`}
+                      onClick={() => handleNotificationItemClick(notif)}
+                      className={`px-4 py-3 border-b border-neutral-100 ${notif?.status === "UNREAD" ? "bg-amber-50/50 cursor-pointer" : "bg-white"}`}
                     >
                       <div className="flex items-start gap-2.5">
                         <span className={`mt-1.5 h-2 w-2 rounded-full ${notif?.status === "UNREAD" ? "bg-amber-500" : "bg-neutral-300"}`} />

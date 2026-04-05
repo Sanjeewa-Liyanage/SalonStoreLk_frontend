@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { getAllNotifications, getUnreadNotificationCount } from "@/lib/notificationService";
+import { getAllNotifications, getUnreadNotificationCount, markAllNotificationsAsRead, markNotificationAsRead } from "@/lib/notificationService";
 
 interface NotificationState {
     items: any[];
@@ -25,6 +25,21 @@ function dedupeNotifications(items: any[]) {
     });
 }
 
+function applyMarkAsRead(state: NotificationState, notificationId: string) {
+    const notification = state.items.find((item) => item.id === notificationId);
+    if (notification && notification.status === 'UNREAD') {
+        notification.status = 'READ';
+        state.unreadCount = Math.max(0, state.unreadCount - 1);
+    }
+}
+
+function applyMarkAllAsRead(state: NotificationState) {
+    state.items = state.items.map((item) => (
+        item?.status === 'UNREAD' ? { ...item, status: 'READ' } : item
+    ));
+    state.unreadCount = 0;
+}
+
 const initialState: NotificationState = {
     items: [],
     unreadCount: 0,
@@ -44,6 +59,22 @@ export const fetchUnreadCount = createAsyncThunk(
     async () => {
         const response = await getUnreadNotificationCount();
         return response; 
+    }
+);
+
+export const markNotificationRead = createAsyncThunk(
+    "notifications/markNotificationRead",
+    async (notificationId: string) => {
+        await markNotificationAsRead(notificationId);
+        return notificationId;
+    }
+);
+
+export const markAllNotificationsRead = createAsyncThunk(
+    "notifications/markAllNotificationsRead",
+    async () => {
+        await markAllNotificationsAsRead();
+        return true;
     }
 );
 
@@ -70,11 +101,10 @@ const notificationSlice = createSlice({
             }
         },
         markAsRead: (state, action: PayloadAction<string>) => {
-            const notification = state.items.find((item) => item.id === action.payload);
-            if (notification && notification.status === 'UNREAD') {
-                notification.status = 'READ';
-                state.unreadCount -= 1;
-            }
+            applyMarkAsRead(state, action.payload);
+        },
+        markAllAsRead: (state) => {
+            applyMarkAllAsRead(state);
         },
     },
     extraReducers: (builder) => {
@@ -104,9 +134,15 @@ const notificationSlice = createSlice({
             .addCase(fetchUnreadCount.fulfilled, (state, action) => {
                 // expecting { unreadCount: number }
                 state.unreadCount = action.payload.unreadCount || 0;
+            })
+            .addCase(markNotificationRead.fulfilled, (state, action) => {
+                applyMarkAsRead(state, action.payload);
+            })
+            .addCase(markAllNotificationsRead.fulfilled, (state) => {
+                applyMarkAllAsRead(state);
             });
     },
 });
 
-export const { setUnreadCount, addNotification, markAsRead } = notificationSlice.actions;
+export const { setUnreadCount, addNotification, markAsRead, markAllAsRead } = notificationSlice.actions;
 export default notificationSlice.reducer;   
