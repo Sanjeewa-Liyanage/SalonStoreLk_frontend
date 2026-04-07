@@ -175,3 +175,20 @@ export async function getAdDetails(adId: string) {
     return data;
 }
 //todo need to change
+
+export async function deleteAd(id: string) {
+    const token = sessionStorage.getItem("accessToken");
+    try {
+        const { data } = await axios.delete(`/api/ads/delete/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return data;
+    } catch (error: any) {
+        if (error?.response?.status !== 401) throw error;
+        const nextAccessToken = await refreshAccessToken();
+        const { data } = await axios.delete(`/api/ads/delete/${id}`, {
+            headers: { Authorization: `Bearer ${nextAccessToken}` },
+        });
+        return data;
+    }
+}

@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, Clock3, ImageOff, Plus } from "lucide-react";
+import { CalendarDays, ChevronDown, Clock3, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import HeaderSalon from "@/components/HeaderSalon";
 import SidebarSalon from "@/components/SidebarSalon";
 import { fetchByOwner } from "@/lib/salonService";
-import { getAdsBySalon } from "@/lib/adsService";
+import { deleteAd, getAdsBySalon } from "@/lib/adsService";
 import { getStoredSalonId, setStoredSalonId } from "@/lib/salonSelection";
+import SalonOwnerConfirmDialog from "@/components/SalonOwnerConfirmDialog";
 import {
 	Card,
 	CardContent,
@@ -24,6 +25,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
 
 type FirestoreTimestamp = {
 	_seconds?: number;
@@ -70,6 +72,8 @@ export default function MyAdsPage() {
 	const [salonLoading, setSalonLoading] = useState(true);
 	const [adsLoading, setAdsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [deleteTargetAd, setDeleteTargetAd] = useState<SalonAd | null>(null);
+	const [actionLoading, setActionLoading] = useState(false);
 
 	const selectedSalon = useMemo(
 		() => salons.find((salon) => salon.id === selectedSalonId),
@@ -137,8 +141,38 @@ export default function MyAdsPage() {
 		setStoredSalonId(salonId);
 	};
 
+	const requestDeleteAd = (ad: SalonAd) => {
+		setDeleteTargetAd(ad);
+	};
+
+	const handleDeleteConfirm = async () => {
+		if (!deleteTargetAd) return;
+
+		try {
+			setActionLoading(true);
+			await deleteAd(deleteTargetAd.id);
+			setAds((currentAds) => currentAds.filter((ad) => ad.id !== deleteTargetAd.id));
+			toast({
+				title: "Ad deleted",
+				description: "Your ad has been deleted successfully.",
+			});
+		} catch (deleteError: any) {
+			const message = deleteError?.response?.data?.message || "Failed to delete ad";
+			setError(message);
+			toast({
+				title: "Delete failed",
+				description: message,
+				variant: "destructive",
+			});
+		} finally {
+			setActionLoading(false);
+			setDeleteTargetAd(null);
+		}
+	};
+
 	return (
 		<AuthGuard allowedRole="SALON_OWNER">
+			<>
 			<div className="flex h-screen bg-gray-50">
 				<div className="hidden md:block">
 					<SidebarSalon />
@@ -293,6 +327,35 @@ export default function MyAdsPage() {
 															Rejection reason: {ad.rejectionReason}
 														</div>
 													)}
+
+													<div className="mt-4 flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+														<Button
+															variant="outline"
+															size="icon"
+															className="h-9 w-9 border-[#C8A84B] bg-[#fff7e6] text-[#8b6f2d] hover:bg-[#f3e2b9]"
+															onClick={() => {
+																toast({
+																	title: "Edit coming soon",
+																	description: "Ad edit flow will be added soon.",
+																});
+															}}
+															aria-label="Edit ad"
+															title="Edit ad"
+														>
+															<Pencil size={16} />
+														</Button>
+														<Button
+															variant="outline"
+															size="icon"
+															className="h-9 w-9 border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+															onClick={() => requestDeleteAd(ad)}
+															disabled={actionLoading}
+															aria-label="Delete ad"
+															title="Delete ad"
+														>
+															<Trash2 size={16} />
+														</Button>
+													</div>
 												</CardContent>
 											</Card>
 										);
@@ -303,6 +366,25 @@ export default function MyAdsPage() {
 					</div>
 				</div>
 			</div>
+			<SalonOwnerConfirmDialog
+				open={Boolean(deleteTargetAd)}
+				title="Delete Ad"
+				description={
+					deleteTargetAd
+						? `Are you sure you want to delete "${deleteTargetAd.title}"? This action cannot be undone.`
+						: "Are you sure you want to delete this ad? This action cannot be undone."
+				}
+				confirmLabel="Yes, Delete"
+				cancelLabel="Cancel"
+				loading={actionLoading}
+				onConfirm={handleDeleteConfirm}
+				onCancel={() => {
+					if (!actionLoading) {
+						setDeleteTargetAd(null);
+					}
+				}}
+			/>
+			</>
 		</AuthGuard>
 	);
 }
