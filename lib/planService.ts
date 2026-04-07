@@ -55,6 +55,7 @@ export async function updatePlan(id: string, planData: any){
         return data;
     }
 }
+
 export async function deletePlan(id: string){
     const token = sessionStorage.getItem("accessToken");
     try{

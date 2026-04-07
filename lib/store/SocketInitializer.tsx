@@ -6,6 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAppDispatch, useAppSelector } from './hooks';
 import { addNotification, fetchUnreadCount } from './slices/notificationSlice';
 import { toast } from '@/hooks/use-toast';
+import { refreshAccessToken } from '@/lib/authService';
 
 const SOCKET_URL = 'https://salon-store-lk-prod-707068751976.asia-south1.run.app';
 const UNREAD_COUNT_POLL_INTERVAL_MS = 8 * 60 * 1000;
@@ -15,6 +16,7 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
     const { isAuthenticated } = useAppSelector((state) => state.auth);
     const socketRef = useRef<Socket | null>(null);
     const processedNotificationIdsRef = useRef<Set<string>>(new Set());
+    const refreshInFlightRef = useRef(false);
 
     useEffect(() => {
         // Clean up any existing socket before creating a new one
@@ -44,6 +46,44 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
         });
 
         socketRef.current = socket;
+
+        const shouldRefreshSocketToken = (err: any) => {
+            const message = String(err?.message || err || '').toLowerCase();
+            return (
+                message.includes('invalid or expired token') ||
+                message.includes('invalid token') ||
+                message.includes('expired token') ||
+                message.includes('jwt expired') ||
+                message.includes('unauthorized')
+            );
+        };
+
+        const refreshTokenAndReconnect = async () => {
+            if (refreshInFlightRef.current) return;
+
+            try {
+                refreshInFlightRef.current = true;
+                const nextAccessToken = await refreshAccessToken();
+
+                if (!socketRef.current) return;
+
+                socketRef.current.auth = { token: nextAccessToken };
+
+                // Ensure next auth payload is used immediately.
+                if (socketRef.current.connected) {
+                    socketRef.current.disconnect();
+                }
+                socketRef.current.connect();
+            } catch (refreshError: any) {
+                console.error('❌ Failed to refresh token for socket reconnect:', refreshError?.message || refreshError);
+
+                sessionStorage.removeItem('accessToken');
+                sessionStorage.removeItem('refreshToken');
+                window.location.href = '/login';
+            } finally {
+                refreshInFlightRef.current = false;
+            }
+        };
 
         socket.on('connect', () => {
             console.log(`✅ Socket connected. ID: ${socket.id}, transport: ${socket.io.engine.transport.name}`);
@@ -97,10 +137,16 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
 
         socket.on('error', (err: any) => {
             console.error('❌ Socket error:', err.message || err);
+            if (shouldRefreshSocketToken(err)) {
+                void refreshTokenAndReconnect();
+            }
         });
 
         socket.on('connect_error', (err: any) => {
             console.error('❌ Socket connection error:', err.message);
+            if (shouldRefreshSocketToken(err)) {
+                void refreshTokenAndReconnect();
+            }
         });
 
         socket.on('disconnect', (reason: string) => {

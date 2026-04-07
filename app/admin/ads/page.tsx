@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
 	Alert,
 	Box,
-	Button,
 	Card,
 	CardContent,
 	Chip,
 	Container,
 	InputAdornment,
+	IconButton,
 	Pagination,
+	Tooltip,
 	Stack,
 	Tab,
 	Tabs,
@@ -22,6 +23,8 @@ import {
 } from '@mui/material';
 import {
 	CheckCircleOutline as CheckCircleOutlineIcon,
+	CancelOutlined as CancelOutlinedIcon,
+	DeleteOutline as DeleteOutlineIcon,
 	PendingActions as PendingActionsIcon,
 	Search as SearchIcon,
 	CampaignOutlined as AdsIcon,
@@ -29,10 +32,11 @@ import {
 import HeaderAdmin from '@/components/HeaderAdmin';
 import Sidebar from '@/components/Sidebar';
 import { useMuiTheme } from '@/context/MuiThemeContext';
-import { getAllAds, approveAd, rejectAd } from '@/lib/adsService';
+import { getAllAds, approveAd, rejectAd, deleteAd } from '@/lib/adsService';
 import SalonLoader from '@/components/Loader';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import AdDetailsDialog from '@/components/AdDetailsDialog';
+import { toast } from '@/hooks/use-toast';
 
 interface Ad {
 	id: string;
@@ -78,6 +82,35 @@ interface AdsSummaryCounts {
 	rejected: number;
 }
 
+interface ApiErrorShape {
+	response?: {
+		data?: {
+			message?: string;
+		};
+	};
+	message?: string;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+	if (typeof error === 'object' && error !== null) {
+		const parsedError = error as ApiErrorShape;
+		const backendMessage = parsedError.response?.data?.message;
+		if (backendMessage && backendMessage.trim()) return backendMessage;
+
+		if (parsedError.message && parsedError.message.trim()) return parsedError.message;
+	}
+
+	return fallback;
+};
+
+const showErrorToast = (message: string) => {
+	toast({
+		title: 'Error',
+		description: message,
+		variant: 'destructive',
+	});
+};
+
 const normalizeAdTab = (value: string | null): AdTab => {
 	if (value === 'pending') return 'pending_approval';
 	if (value === 'active' || value === 'pending_approval' || value === 'all' || value === 'rejected') return value;
@@ -102,10 +135,10 @@ interface AdTableProps {
 	ads: Ad[];
 	isDark: boolean;
 	currentTab: AdTab;
-	showActions?: boolean;
 	processingId?: string | null;
 	onApprove?: (id: string) => void;
 	onReject?: (id: string) => void;
+	onDelete?: (id: string) => void;
 	onRowClick?: (id: string) => void;
 }
 
@@ -113,15 +146,14 @@ const AdTable = ({
 	ads,
 	isDark,
 	currentTab,
-	showActions = false,
 	processingId,
 	onApprove,
 	onReject,
+	onDelete,
 	onRowClick,
 }: AdTableProps) => {
-	const headers = showActions
-		? ['Title', 'Salon Name', 'Status', 'Created', 'Actions']
-		: ['Title', 'Salon Name', 'Status', 'Created'];
+	const headers = ['Title', 'Salon Name', 'Status', 'Created', 'Actions'];
+	const showModerationActions = currentTab === 'pending_approval';
 
 	const cellSx = (extra?: object) => ({
 		py: 1.6,
@@ -197,37 +229,62 @@ const AdTable = ({
 								{formatDate(ad.createdAt)}
 							</Box>
 
-							{/* Actions column — shown in pending tabs */}
-							{showActions && (
-								<Box component="td" sx={cellSx()}>
-									<Stack direction="row" spacing={1}>
-										{currentTab === 'pending_approval' && (
-											<>
-												<Button
+							<Box component="td" sx={cellSx()}>
+								<Stack direction="row" spacing={0.5} alignItems="center">
+									{showModerationActions && (
+										<>
+											<Tooltip title="Approve">
+												<span>
+													<IconButton
+														size="small"
+														color="success"
+														onClick={(e) => {
+															e.stopPropagation();
+															onApprove?.(ad.id);
+														}}
+														disabled={processingId === ad.id}
+														aria-label="Approve ad"
+													>
+														<CheckCircleOutlineIcon fontSize="small" />
+														</IconButton>
+													</span>
+											</Tooltip>
+											<Tooltip title="Reject">
+												<span>
+													<IconButton
+														size="small"
+														color="error"
+														onClick={(e) => {
+															e.stopPropagation();
+															onReject?.(ad.id);
+														}}
+														disabled={processingId === ad.id}
+														aria-label="Reject ad"
+													>
+														<CancelOutlinedIcon fontSize="small" />
+														</IconButton>
+													</span>
+											</Tooltip>
+										</>
+									)}
+										<Tooltip title="Delete">
+											<span>
+												<IconButton
 													size="small"
-													variant="contained"
-													color="success"
-													onClick={(e) => { e.stopPropagation(); onApprove?.(ad.id); }}
-													disabled={processingId === ad.id}
-													sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-												>
-													{processingId === ad.id ? 'Approving...' : 'Approve'}
-												</Button>
-												<Button
-													size="small"
-													variant="outlined"
 													color="error"
-													onClick={(e) => { e.stopPropagation(); onReject?.(ad.id); }}
+													onClick={(e) => {
+														e.stopPropagation();
+														onDelete?.(ad.id);
+													}}
 													disabled={processingId === ad.id}
-													sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+													aria-label="Delete ad"
 												>
-													{processingId === ad.id ? 'Rejecting...' : 'Reject'}
-												</Button>
-											</>
-										)}
+													<DeleteOutlineIcon fontSize="small" />
+												</IconButton>
+											</span>
+										</Tooltip>
 									</Stack>
-								</Box>
-							)}
+							</Box>
 						</Box>
 					))}
 				</Box>
@@ -271,6 +328,7 @@ function AdminAdsPageContent() {
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [rejectConfirmState, setRejectConfirmState] = useState<string | null>(null);
+	const [deleteConfirmState, setDeleteConfirmState] = useState<string | null>(null);
 	const [rejectReason, setRejectReason] = useState('');
 	const [viewAdId, setViewAdId] = useState<string | null>(null);
 
@@ -334,7 +392,9 @@ function AdminAdsPageContent() {
 			} catch (fetchError) {
 				if (!isMounted) return;
 				console.error('Error loading ads:', fetchError);
-				setError(fetchError instanceof Error ? fetchError.message : 'Something went wrong');
+				const message = getErrorMessage(fetchError, 'Something went wrong');
+				setError(message);
+				showErrorToast(message);
 			} finally {
 				if (isMounted) {
 					setLoading(false);
@@ -413,7 +473,9 @@ function AdminAdsPageContent() {
 			applyAdsResponse(payload, page);
 			await refreshSummaryCounts(token);
 		} catch (err) {
-			setActionError(err instanceof Error ? err.message : 'Failed to approve ad.');
+			const message = getErrorMessage(err, 'Failed to approve ad.');
+			setActionError(message);
+			showErrorToast(message);
 		} finally {
 			setProcessingId(null);
 		}
@@ -431,7 +493,34 @@ function AdminAdsPageContent() {
 			applyAdsResponse(payload, page);
 			await refreshSummaryCounts(token);
 		} catch (err) {
-			setActionError(err instanceof Error ? err.message : 'Failed to reject ad.');
+			const message = getErrorMessage(err, 'Failed to reject ad.');
+			setActionError(message);
+			showErrorToast(message);
+		} finally {
+			setProcessingId(null);
+		}
+	};
+
+	const handleDelete = async (adId: string) => {
+		try {
+			setProcessingId(adId);
+			setActionError(null);
+			const token = resolveAccessToken();
+
+			await deleteAd(adId);
+			await refreshSummaryCounts(token);
+
+			if (ads.length === 1 && page > 1) {
+				setPage((currentPage) => Math.max(1, currentPage - 1));
+				return;
+			}
+
+			const payload = (await getAllAds({ page, limit: rowsPerPage, type: activeTab }, token)) as AdsListResponse;
+			applyAdsResponse(payload, page);
+		} catch (err) {
+			const message = getErrorMessage(err, 'Failed to delete ad.');
+			setActionError(message);
+			showErrorToast(message);
 		} finally {
 			setProcessingId(null);
 		}
@@ -442,9 +531,18 @@ function AdminAdsPageContent() {
 		setRejectReason('');
 	};
 
+	const requestDelete = (adId: string) => {
+		setDeleteConfirmState(adId);
+	};
+
 	const cancelRejectConfirm = () => {
 		if (processingId) return;
 		setRejectConfirmState(null);
+	};
+
+	const cancelDeleteConfirm = () => {
+		if (processingId) return;
+		setDeleteConfirmState(null);
 	};
 
 	const confirmReject = async () => {
@@ -453,9 +551,20 @@ function AdminAdsPageContent() {
 		setRejectConfirmState(null);
 	};
 
+	const confirmDelete = async () => {
+		if (!deleteConfirmState) return;
+		await handleDelete(deleteConfirmState);
+		setDeleteConfirmState(null);
+	};
+
 	const rejectTargetAd = useMemo(
 		() => ads.find((ad) => ad.id === rejectConfirmState),
 		[ads, rejectConfirmState]
+	);
+
+	const deleteTargetAd = useMemo(
+		() => ads.find((ad) => ad.id === deleteConfirmState),
+		[ads, deleteConfirmState]
 	);
 
 	if (loading) {
@@ -612,10 +721,10 @@ function AdminAdsPageContent() {
 													ads={filteredList}
 													isDark={isDark}
 													currentTab={activeTab}
-													showActions={activeTab === 'pending_approval'}
 													processingId={processingId}
 													onApprove={handleApprove}
 													onReject={requestReject}
+													onDelete={requestDelete}
 													onRowClick={(id) => setViewAdId(id)}
 												/>
 											)}
@@ -675,6 +784,22 @@ function AdminAdsPageContent() {
 				onConfirm={confirmReject}
 				onCancel={cancelRejectConfirm}
 				loading={processingId === rejectConfirmState}
+			/>
+
+			<ConfirmDialog
+				open={Boolean(deleteConfirmState)}
+				title="Delete Ad"
+				message={
+					deleteTargetAd
+						? `Are you sure you want to delete "${deleteTargetAd.title}"? This action cannot be undone.`
+						: 'Are you sure you want to delete this ad? This action cannot be undone.'
+				}
+				variant="danger"
+				confirmLabel="Yes, Delete"
+				cancelLabel="Cancel"
+				onConfirm={confirmDelete}
+				onCancel={cancelDeleteConfirm}
+				loading={processingId === deleteConfirmState}
 			/>
 		</>
 	);
