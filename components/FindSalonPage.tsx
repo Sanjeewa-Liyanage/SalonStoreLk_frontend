@@ -26,6 +26,7 @@ type AdDto = {
   title: string;
   description?: string;
   imageUrl?: string[];
+  videoUrl?: string[];
   salonName?: string;
   createdAt?: TimestampDto;
 };
@@ -90,58 +91,110 @@ function BlurredContainImage({
   );
 }
 
-function AdImageLayout({ images, title }: { images: string[]; title: string }) {
-  const safeImages = images.length ? images : [PLACEHOLDER_IMG];
+type MediaItem = { type: 'image'; url: string } | { type: 'video'; url: string };
 
-  if (safeImages.length === 1) {
+function MediaTile({
+  item,
+  alt,
+  heightClass,
+  overlay,
+}: {
+  item: MediaItem;
+  alt: string;
+  heightClass: string;
+  overlay?: React.ReactNode;
+}) {
+  if (item.type === 'video') {
     return (
-      <div className="overflow-hidden rounded-xl border border-black/10 bg-white">
-        <BlurredContainImage src={safeImage(safeImages[0])} alt={title} heightClass="h-72" />
+      <div className={`relative overflow-hidden rounded-xl border border-black/10 bg-black ${heightClass}`}>
+        <video
+          src={item.url}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          controls
+          onClick={(e) => e.stopPropagation()}
+          className="h-full w-full object-contain"
+        />
+        {overlay}
       </div>
     );
   }
+  return (
+    <div className={`relative overflow-hidden rounded-xl border border-black/10 bg-white ${heightClass}`}>
+      <BlurredContainImage src={safeImage(item.url)} alt={alt} heightClass="h-full" />
+      {overlay}
+    </div>
+  );
+}
 
-  if (safeImages.length === 2) {
+function AdMediaLayout({
+  images,
+  videos,
+  title,
+}: {
+  images: string[];
+  videos: string[];
+  title: string;
+}) {
+  // Merge: images first, then videos
+  const media: MediaItem[] = [
+    ...(images.length ? images : [PLACEHOLDER_IMG]).map(
+      (url): MediaItem => ({ type: 'image', url })
+    ),
+    ...videos.map((url): MediaItem => ({ type: 'video', url })),
+  ];
+
+  if (media.length === 1) {
+    return (
+      <MediaTile item={media[0]} alt={title} heightClass="h-72" />
+    );
+  }
+
+  if (media.length === 2) {
     return (
       <div className="grid grid-cols-2 gap-1.5">
-        {safeImages.slice(0, 2).map((image, idx) => (
-          <div key={`${image}-${idx}`} className="overflow-hidden rounded-xl border border-black/10 bg-white">
-            <BlurredContainImage src={safeImage(image)} alt={`${title} ${idx + 1}`} heightClass="h-64" />
-          </div>
+        {media.slice(0, 2).map((item, idx) => (
+          <MediaTile key={`${item.url}-${idx}`} item={item} alt={`${title} ${idx + 1}`} heightClass="h-64" />
         ))}
       </div>
     );
   }
 
-  if (safeImages.length === 3) {
+  if (media.length === 3) {
     return (
       <div className="grid grid-cols-2 gap-1.5">
-        <div className="overflow-hidden rounded-xl border border-black/10 bg-white">
-          <BlurredContainImage src={safeImage(safeImages[0])} alt={`${title} 1`} heightClass="h-96" />
+        <MediaTile item={media[0]} alt={`${title} 1`} heightClass="h-96" />
+        <div className="flex flex-col gap-1.5">
+          {media.slice(1, 3).map((item, idx) => (
+            <MediaTile key={`${item.url}-${idx}`} item={item} alt={`${title} ${idx + 2}`} heightClass="h-[188px]" />
+          ))}
         </div>
-        {safeImages.slice(1, 3).map((image, idx) => (
-          <div key={`${image}-${idx}`} className="overflow-hidden rounded-xl border border-black/10 bg-white">
-            <BlurredContainImage src={safeImage(image)} alt={`${title} ${idx + 2}`} heightClass="h-48" />
-          </div>
-        ))}
       </div>
     );
   }
 
-  const visible = safeImages.slice(0, 4);
-  const remaining = safeImages.length - 4;
+  // 4 or more — show first 4, overlay +N on last
+  const visible = media.slice(0, 4);
+  const remaining = media.length - 4;
 
   return (
     <div className="grid grid-cols-2 gap-1.5">
-      {visible.map((image, idx) => (
-        <div key={`${image}-${idx}`} className="relative overflow-hidden rounded-xl border border-black/10 bg-white">
-          <BlurredContainImage src={safeImage(image)} alt={`${title} ${idx + 1}`} heightClass="h-48" />
-          {idx === 3 && remaining > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-2xl font-bold text-white">
-              +{remaining}
-            </div>
-          )}
-        </div>
+      {visible.map((item, idx) => (
+        <MediaTile
+          key={`${item.url}-${idx}`}
+          item={item}
+          alt={`${title} ${idx + 1}`}
+          heightClass="h-48"
+          overlay={
+            idx === 3 && remaining > 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50 text-2xl font-bold text-white pointer-events-none">
+                +{remaining}
+              </div>
+            ) : undefined
+          }
+        />
       ))}
     </div>
   );
@@ -377,7 +430,11 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
               <div className="space-y-3 p-4">
                 <h3 className="text-base font-semibold text-black">{ad.title}</h3>
                 <p className="line-clamp-4 text-sm leading-relaxed text-black/70">{ad.description || 'Exclusive promotion from our salon partner.'}</p>
-                <AdImageLayout images={Array.isArray(ad.imageUrl) ? ad.imageUrl : []} title={ad.title} />
+                <AdMediaLayout
+                  images={Array.isArray(ad.imageUrl) ? ad.imageUrl : []}
+                  videos={Array.isArray(ad.videoUrl) ? ad.videoUrl : []}
+                  title={ad.title}
+                />
               </div>
 
               <div className="flex items-center justify-between border-t border-black/5 px-4 py-3">
