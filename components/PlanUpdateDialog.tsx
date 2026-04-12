@@ -38,6 +38,8 @@ interface PlanDetails {
   updatedAt?: PlanTimestamp;
   duration: number;
   priority: number;
+  imageCount?: number;
+  videoCount?: number;
 }
 
 interface UpdatePlanPayload {
@@ -48,6 +50,8 @@ interface UpdatePlanPayload {
   features: string[];
   duration: number;
   priority: number;
+  imageCount?: number;
+  videoCount?: number;
 }
 
 interface PlanUpdateDialogProps {
@@ -65,6 +69,8 @@ const DEFAULT_FORM: UpdatePlanPayload = {
   features: [''],
   duration: 30,
   priority: 1,
+  imageCount: 0,
+  videoCount: 0,
 };
 
 export default function PlanUpdateDialog({
@@ -87,6 +93,8 @@ export default function PlanUpdateDialog({
       features: plan.features?.length ? plan.features : [''],
       duration: Number(plan.duration || 0),
       priority: Number(plan.priority || 1),
+      imageCount: Number(plan.imageCount || 0),
+      videoCount: Number(plan.videoCount || 0),
     });
     setError(null);
   }, [open, plan]);
@@ -217,6 +225,26 @@ export default function PlanUpdateDialog({
               fullWidth
               required
               inputProps={{ min: 1 }}
+            />
+
+            <TextField
+              label="Image Count"
+              type="number"
+              value={form.imageCount ?? 0}
+              onChange={(event) => setForm((prev) => ({ ...prev, imageCount: Number(event.target.value) }))}
+              size="small"
+              fullWidth
+              inputProps={{ min: 0 }}
+            />
+
+            <TextField
+              label="Video Count"
+              type="number"
+              value={form.videoCount ?? 0}
+              onChange={(event) => setForm((prev) => ({ ...prev, videoCount: Number(event.target.value) }))}
+              size="small"
+              fullWidth
+              inputProps={{ min: 0 }}
             />
 
             <TextField

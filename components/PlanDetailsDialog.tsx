@@ -32,6 +32,8 @@ interface PlanDetails {
   updatedAt?: PlanTimestamp;
   duration: number;
   priority: number;
+  imageCount?: number;
+  videoCount?: number;
 }
 
 interface PlanDetailsDialogProps {
@@ -92,6 +94,14 @@ export default function PlanDetailsDialog({ open, onClose, plan }: PlanDetailsDi
               <Box>
                 <Typography variant="caption" color="text.secondary">Priority</Typography>
                 <Typography variant="body2">P{plan.priority}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Image Count</Typography>
+                <Typography variant="body2">{plan.imageCount ?? 0}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Video Count</Typography>
+                <Typography variant="body2">{plan.videoCount ?? 0}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">Status</Typography>
