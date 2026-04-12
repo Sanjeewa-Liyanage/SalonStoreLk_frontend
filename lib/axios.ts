@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from "./tokenStorage";
 
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
@@ -8,7 +9,7 @@ const apiClient = axios.create({
 });
 
 async function refreshTokens() {
-  const refreshToken = sessionStorage.getItem("refreshToken");
+  const refreshToken = getRefreshToken();
 
   if (!refreshToken) {
     throw new Error("No refresh token available");
@@ -35,8 +36,7 @@ async function refreshTokens() {
     throw new Error("Invalid refresh token response");
   }
 
-  sessionStorage.setItem("accessToken", accessToken);
-  sessionStorage.setItem("refreshToken", nextRefreshToken);
+  setAuthTokens(accessToken, nextRefreshToken);
 
   return accessToken;
 }
@@ -44,7 +44,7 @@ async function refreshTokens() {
 apiClient.interceptors.request.use((config) => {
   // Only access sessionStorage on the client side
   if (typeof window !== "undefined") {
-    const token = sessionStorage.getItem("accessToken");
+    const token = getAccessToken();
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
@@ -68,8 +68,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
 
       } catch (refreshErr) {
-        sessionStorage.removeItem("accessToken");
-        sessionStorage.removeItem("refreshToken");
+        clearAuthTokens();
         window.location.href = "/login";
         return Promise.reject(refreshErr);
       }

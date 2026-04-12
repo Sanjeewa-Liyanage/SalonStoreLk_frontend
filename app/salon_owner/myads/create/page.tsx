@@ -10,7 +10,7 @@ import { fetchByOwner } from "@/lib/salonService";
 import { createAd } from "@/lib/adsService";
 import { fetchPlanUsage } from "@/lib/planService";
 import { createPayment } from "@/lib/paymentService";
-import { uploadAdImages, uploadTransactionImage } from "@/lib/firebase";
+import { uploadAdImages, uploadAdVideos, uploadTransactionImage } from "@/lib/firebase";
 import { getStoredSalonId, setStoredSalonId } from "@/lib/salonSelection";
 import { toast } from "sonner";
 import {
@@ -40,8 +40,11 @@ import {
 } from "@/components/ui/dialog";
 
 type PlanOption = {
+
   id: string;
   planName: string;
+  imageCount: number;
+  videoCount: number;
 };
 
 function extractAdId(response: any): string | null {
@@ -59,6 +62,7 @@ function extractAdId(response: any): string | null {
 export default function CreateAdPage() {
   const router = useRouter();
   const adImageInputRef = useRef<HTMLInputElement>(null);
+  const adVideoInputRef = useRef<HTMLInputElement>(null);
   const paymentFileInputRef = useRef<HTMLInputElement>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -74,6 +78,9 @@ export default function CreateAdPage() {
   const [adImageFiles, setAdImageFiles] = useState<File[]>([]);
   const [adImagePreviews, setAdImagePreviews] = useState<string[]>([]);
 
+  const [adVideoFiles, setAdVideoFiles] = useState<File[]>([]);
+  const [adVideoPreviews, setAdVideoPreviews] = useState<string[]>([]);
+
   const [creatingAd, setCreatingAd] = useState(false);
   const [createdAdId, setCreatedAdId] = useState<string>("");
 
@@ -85,6 +92,14 @@ export default function CreateAdPage() {
     () => salons.find((salon) => salon.id === selectedSalonId),
     [salons, selectedSalonId]
   );
+
+  const selectedPlan = useMemo(
+    () => plans.find((plan) => plan.id === planId),
+    [plans, planId]
+  );
+
+  const maxImages = selectedPlan?.imageCount || 0;
+  const maxVideos = selectedPlan?.videoCount || 0;
 
   useEffect(() => {
     const loadData = async () => {
@@ -117,7 +132,8 @@ export default function CreateAdPage() {
           setPlanId(planList[0].id);
         }
       } catch (error: any) {
-        toast.error(error?.response?.data?.message || "Failed to load create-ad data");
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to load create-ad data";
+        toast.error(errorMessage);
       } finally {
         setLoadingPageData(false);
       }
@@ -136,8 +152,40 @@ export default function CreateAdPage() {
     if (!files) return;
 
     const selectedFiles = Array.from(files);
-    setAdImageFiles((prev) => [...prev, ...selectedFiles]);
+    const remaining = maxImages - adImageFiles.length;
 
+    // Case 1: Already at limit
+    if (remaining <= 0) {
+      toast.error(
+        `You've reached the image limit for ${selectedPlan?.planName} (${maxImages} image${maxImages !== 1 ? "s" : ""}).`
+      );
+      event.target.value = "";
+      return;
+    }
+
+    // Case 2: Selected more than remaining slots — accept what fits, warn about the rest
+    if (selectedFiles.length > remaining) {
+      const acceptedFiles = selectedFiles.slice(0, remaining);
+      const rejectedCount = selectedFiles.length - remaining;
+
+      toast.error(
+        `Only ${remaining} slot${remaining !== 1 ? "s" : ""} remaining. ${rejectedCount} image${rejectedCount !== 1 ? "s were" : " was"} not added.`
+      );
+
+      acceptedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAdImagePreviews((prev) => [...prev, String(reader.result)]);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      setAdImageFiles((prev) => [...prev, ...acceptedFiles]);
+      event.target.value = "";
+      return;
+    }
+
+    // Case 3: All selected files fit within the limit
     selectedFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -145,6 +193,9 @@ export default function CreateAdPage() {
       };
       reader.readAsDataURL(file);
     });
+
+    setAdImageFiles((prev) => [...prev, ...selectedFiles]);
+    event.target.value = "";
   };
 
   const removeAdImage = (index: number) => {
@@ -158,6 +209,64 @@ export default function CreateAdPage() {
     const uploadBatchKey = `draft_${Date.now()}`;
     const uploaded = await Promise.all(
       files.map((file) => uploadAdImages(file, salonCode, uploadBatchKey))
+    );
+    return uploaded.map((item) => item.url);
+  };
+
+  // ── Video upload helpers ────────────────────────────────────────────────────
+
+  const handleAdVideoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const selectedFiles = Array.from(files);
+    const remaining = maxVideos - adVideoFiles.length;
+
+    // Case 1: Already at limit
+    if (remaining <= 0) {
+      toast.error(
+        `You've reached the video limit for ${selectedPlan?.planName} (${maxVideos} video${maxVideos !== 1 ? "s" : ""}).`
+      );
+      event.target.value = "";
+      return;
+    }
+
+    // Case 2: Selected more than remaining slots — accept what fits, warn about the rest
+    if (selectedFiles.length > remaining) {
+      const acceptedFiles = selectedFiles.slice(0, remaining);
+      const rejectedCount = selectedFiles.length - remaining;
+
+      toast.error(
+        `Only ${remaining} slot${remaining !== 1 ? "s" : ""} remaining. ${rejectedCount} video${rejectedCount !== 1 ? "s were" : " was"} not added.`
+      );
+
+      const newPreviews = acceptedFiles.map((file) => URL.createObjectURL(file));
+      setAdVideoFiles((prev) => [...prev, ...acceptedFiles]);
+      setAdVideoPreviews((prev) => [...prev, ...newPreviews]);
+      event.target.value = "";
+      return;
+    }
+
+    // Case 3: All selected files fit within the limit
+    const newPreviews = selectedFiles.map((file) => URL.createObjectURL(file));
+    setAdVideoFiles((prev) => [...prev, ...selectedFiles]);
+    setAdVideoPreviews((prev) => [...prev, ...newPreviews]);
+    event.target.value = "";
+  };
+
+  const removeAdVideo = (index: number) => {
+    // Revoke the object URL to free browser memory
+    URL.revokeObjectURL(adVideoPreviews[index]);
+    setAdVideoFiles((prev) => prev.filter((_, i) => i !== index));
+    setAdVideoPreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadAdVideoFiles = async (files: File[], salonCode: string): Promise<string[]> => {
+    if (files.length === 0) return [];
+
+    const uploadBatchKey = `draft_${Date.now()}`;
+    const uploaded = await Promise.all(
+      files.map((file) => uploadAdVideos(file, salonCode, uploadBatchKey))
     );
     return uploaded.map((item) => item.url);
   };
@@ -177,12 +286,16 @@ export default function CreateAdPage() {
     try {
       setCreatingAd(true);
       const salonCode = selectedSalon?.salonCode || selectedSalon?.id || selectedSalonId;
-      const imageUrl = await uploadAdPhotos(adImageFiles, salonCode);
+      const [imageUrl, videoUrl] = await Promise.all([
+        uploadAdPhotos(adImageFiles, salonCode),
+        uploadAdVideoFiles(adVideoFiles, salonCode),
+      ]);
 
       const payload = {
         title: title.trim(),
         description: description.trim(),
         imageUrl,
+        videoUrl,
         planId,
         salonId: selectedSalonId,
         paymentMethod: "BANK_TRANSFER",
@@ -399,8 +512,15 @@ export default function CreateAdPage() {
 
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label className="text-gray-800">Ad Images</Label>
-                          <div>
+                          <Label className="text-gray-800">
+                            Ad Images{" "}
+                            {selectedPlan && (
+                              <span className="text-xs text-gray-500 font-normal ml-1">
+                                ({adImageFiles.length}/{maxImages} allowed)
+                              </span>
+                            )}
+                          </Label>
+                          <div className="flex items-center gap-2">
                             <input
                               ref={adImageInputRef}
                               type="file"
@@ -413,6 +533,7 @@ export default function CreateAdPage() {
                               type="button"
                               variant="outline"
                               className="bg-white text-black border-gray-300 hover:bg-gray-100"
+                              disabled={maxImages > 0 && adImageFiles.length >= maxImages} // disable when limit reached
                               onClick={() => adImageInputRef.current?.click()}
                             >
                               <Upload size={16} className="mr-2" />
@@ -443,6 +564,70 @@ export default function CreateAdPage() {
                         ) : (
                           <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-sm text-center text-gray-600">
                             No images selected yet.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── Video Upload Section ── */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-gray-800">
+                            Ad Videos{" "}
+                            {selectedPlan && (
+                              <span className="text-xs text-gray-500 font-normal ml-1">
+                                ({adVideoFiles.length}/{maxVideos} allowed)
+                              </span>
+                            )}
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              ref={adVideoInputRef}
+                              type="file"
+                              accept="video/mp4,video/webm,video/ogg"
+                              multiple
+                              className="hidden"
+                              onChange={handleAdVideoSelect}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="bg-white text-black border-gray-300 hover:bg-gray-100"
+                              disabled={maxVideos > 0 && adVideoFiles.length >= maxVideos}
+                              onClick={() => adVideoInputRef.current?.click()}
+                            >
+                              <Upload size={16} className="mr-2" />
+                              Upload Videos
+                            </Button>
+                          </div>
+                        </div>
+
+                        {adVideoPreviews.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {adVideoPreviews.map((preview, index) => (
+                              <div key={`${preview}-${index}`} className="relative group">
+                                <video
+                                  src={preview}
+                                  controls
+                                  className="w-full h-36 object-cover rounded-md border border-gray-200 bg-black"
+                                />
+                                <p className="text-xs text-gray-500 mt-1 truncate px-1">
+                                  {adVideoFiles[index]?.name}
+                                </p>
+                                <button
+                                  type="button"
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100"
+                                  onClick={() => removeAdVideo(index)}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-sm text-center text-gray-600">
+                            {maxVideos === 0
+                              ? "Your selected plan does not include video uploads."
+                              : "No videos selected yet."}
                           </div>
                         )}
                       </div>

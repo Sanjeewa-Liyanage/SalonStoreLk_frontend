@@ -1,5 +1,6 @@
 import axios from "axios";
 import apiClient from "./axios";
+import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from "./tokenStorage";
 
 type ForgotPasswordResponse = {
   token: string;
@@ -119,7 +120,7 @@ export async function getUserProfile() {
 }
 
 export async function updateUserProfile(payload: Record<string, any>) {
-  const token = sessionStorage.getItem("accessToken");
+  const token = getAccessToken();
   if (!token) {
     throw new Error("No access token found. Please login again.");
   }
@@ -140,7 +141,7 @@ export async function updateUserProfile(payload: Record<string, any>) {
 }
 
 export async function resetPasswordWithCurrent(oldPassword: string, newPassword: string) {
-  const token = sessionStorage.getItem("accessToken");
+  const token = getAccessToken();
   if (!token) {
     throw new Error("No access token found. Please login again.");
   }
@@ -165,7 +166,7 @@ export async function resetPasswordWithCurrent(oldPassword: string, newPassword:
 }
 
 export async function refreshAccessToken() {
-    const refreshToken = sessionStorage.getItem("refreshToken");
+  const refreshToken = getRefreshToken();
 
     if (!refreshToken) {
         throw new Error("No refresh token found. Please login again.");
@@ -190,13 +191,11 @@ export async function refreshAccessToken() {
         throw new Error("Invalid refresh response");
     }
 
-    sessionStorage.setItem("accessToken", data.accessToken);
-    sessionStorage.setItem("refreshToken", data.refreshToken);
+    setAuthTokens(data.accessToken, data.refreshToken);
 
     return data.accessToken as string;
 }
 
 export async function logoutUser() {
-  sessionStorage.removeItem("accessToken");
-  sessionStorage.removeItem("refreshToken");
+  clearAuthTokens();
 }

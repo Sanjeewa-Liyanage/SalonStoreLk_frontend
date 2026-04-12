@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { clearAuthTokens, setAccessToken } from '@/lib/tokenStorage';
 
 interface User {
     id: string;
@@ -29,13 +30,14 @@ const authSlice = createSlice({
             state.user = action.payload.user;
             state.isAuthenticated = true;
             state.isLoading = false;
-            sessionStorage.setItem('accessToken', action.payload.accessToken);
+            setAccessToken(action.payload.accessToken);
+            
         },
         logout: (state) => {
             state.user = null;
             state.isAuthenticated = false;
             state.isLoading = false;
-            sessionStorage.removeItem('accessToken');
+            clearAuthTokens();
         },
         setAuthLoading: (state, action: PayloadAction<boolean>) => {
             state.isLoading = action.payload;
