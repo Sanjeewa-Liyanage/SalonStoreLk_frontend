@@ -27,6 +27,7 @@ type AdDetails = {
   title: string;
   description?: string;
   imageUrl?: string[] | string;
+  videoUrl?: string[] | string;
   salonName?: string;
   startDate?: FirestoreTimestamp;
 };
@@ -78,81 +79,102 @@ function splitDescription(rawDescription: string) {
   return { paragraphs, bulletItems };
 }
 
+type GalleryItem = { type: 'image'; url: string } | { type: 'video'; url: string };
+
 type AdGalleryProps = {
   images: string[];
+  videos: string[];
   adTitle: string;
 };
 
-function AdGallery({ images, adTitle }: AdGalleryProps) {
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const imageSignature = images.join('|');
-  const hasMultipleImages = images.length > 1;
+function AdGallery({ images, videos, adTitle }: AdGalleryProps) {
+  // Merge images first, then videos
+  const media: GalleryItem[] = [
+    ...images.map((url): GalleryItem => ({ type: 'image', url })),
+    ...videos.map((url): GalleryItem => ({ type: 'video', url })),
+  ];
 
-  useEffect(() => {
-    setSelectedImageIndex(0);
-  }, [imageSignature]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const mediaSignature = media.map((m) => m.url).join('|');
+  const hasMultiple = media.length > 1;
 
+  // Reset to first item when media list changes
   useEffect(() => {
-    if (!hasMultipleImages) return;
+    setSelectedIndex(0);
+  }, [mediaSignature]);
+
+  // Auto-advance only when the active item is an image (pause on videos)
+  useEffect(() => {
+    if (!hasMultiple) return;
+    if (media[selectedIndex]?.type === 'video') return;
 
     const timerId = window.setInterval(() => {
-      setSelectedImageIndex((current) => (current + 1) % images.length);
+      setSelectedIndex((current) => {
+        const next = (current + 1) % media.length;
+        return next;
+      });
     }, 4500);
 
     return () => window.clearInterval(timerId);
-  }, [hasMultipleImages, images.length, imageSignature]);
+  }, [hasMultiple, media.length, mediaSignature, selectedIndex]);
 
-  const activeImage = images[selectedImageIndex] || images[0] || FALLBACK_AD_IMAGE;
+  const activeItem = media[selectedIndex] ?? media[0];
 
-  const showPrevious = () => {
-    setSelectedImageIndex((current) => (current - 1 + images.length) % images.length);
-  };
+  const showPrevious = () =>
+    setSelectedIndex((current) => (current - 1 + media.length) % media.length);
 
-  const showNext = () => {
-    setSelectedImageIndex((current) => (current + 1) % images.length);
-  };
+  const showNext = () =>
+    setSelectedIndex((current) => (current + 1) % media.length);
 
   const handleKeyNavigation = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!hasMultipleImages) return;
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      showPrevious();
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      showNext();
-    }
+    if (!hasMultiple) return;
+    if (event.key === 'ArrowLeft') { event.preventDefault(); showPrevious(); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); showNext(); }
   };
+
+  if (!activeItem) return null;
 
   return (
     <section
       className="space-y-3"
       tabIndex={0}
       onKeyDown={handleKeyNavigation}
-      aria-label="Ad image gallery"
+      aria-label="Ad media gallery"
     >
-      <div className="relative overflow-hidden rounded-xl border border-[#d4a32b]/40 bg-zinc-100 p-2">
+      {/* Main viewer */}
+      <div className="relative overflow-hidden rounded-xl border border-[#d4a32b]/40 bg-zinc-900 p-2">
         <div className="flex h-[clamp(300px,56vh,640px)] items-center justify-center">
-          <img
-            src={activeImage}
-            alt={adTitle}
-            className="max-h-full w-full rounded-lg object-contain"
-            onError={(event) => {
-              const target = event.currentTarget;
-              if (target.src !== FALLBACK_AD_IMAGE) {
-                target.src = FALLBACK_AD_IMAGE;
-              }
-            }}
-          />
+          {activeItem.type === 'video' ? (
+            <video
+              key={activeItem.url}
+              src={activeItem.url}
+              controls
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="max-h-full w-full rounded-lg object-contain"
+            />
+          ) : (
+            <img
+              src={activeItem.url}
+              alt={adTitle}
+              className="max-h-full w-full rounded-lg object-contain"
+              onError={(event) => {
+                const target = event.currentTarget;
+                if (target.src !== FALLBACK_AD_IMAGE) target.src = FALLBACK_AD_IMAGE;
+              }}
+            />
+          )}
         </div>
 
-        {hasMultipleImages && (
+        {hasMultiple && (
           <>
             <button
               type="button"
               onClick={showPrevious}
               className="absolute left-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white"
-              aria-label="Previous image"
+              aria-label="Previous"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -160,7 +182,7 @@ function AdGallery({ images, adTitle }: AdGalleryProps) {
               type="button"
               onClick={showNext}
               className="absolute right-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white"
-              aria-label="Next image"
+              aria-label="Next"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -168,33 +190,49 @@ function AdGallery({ images, adTitle }: AdGalleryProps) {
         )}
       </div>
 
+      {/* Thumbnail strip */}
       <div
         className="no-scrollbar flex gap-2 overflow-x-auto overflow-y-hidden pb-1"
         style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
       >
-        {images.map((image, index) => (
+        {media.map((item, index) => (
           <button
-            key={`${image}-${index}`}
+            key={`${item.url}-${index}`}
             type="button"
-            onClick={() => setSelectedImageIndex(index)}
-            aria-label={`View image ${index + 1}`}
-            className={`h-20 w-28 shrink-0 overflow-hidden rounded-md border transition sm:h-24 sm:w-36 ${
-              selectedImageIndex === index
+            onClick={() => setSelectedIndex(index)}
+            aria-label={`View ${item.type} ${index + 1}`}
+            className={`relative h-20 w-28 shrink-0 overflow-hidden rounded-md border transition sm:h-24 sm:w-36 ${
+              selectedIndex === index
                 ? 'border-[#d4a32b] ring-1 ring-[#d4a32b]'
                 : 'border-black/15 hover:border-[#d4a32b]/60'
             }`}
           >
-            <img
-              src={image}
-              alt={`${adTitle} image ${index + 1}`}
-              className="h-full w-full object-cover"
-              onError={(event) => {
-                const target = event.currentTarget;
-                if (target.src !== FALLBACK_AD_IMAGE) {
-                  target.src = FALLBACK_AD_IMAGE;
-                }
-              }}
-            />
+            {item.type === 'video' ? (
+              <>
+                <video
+                  src={item.url}
+                  muted
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                />
+                {/* Play icon overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <svg viewBox="0 0 24 24" fill="white" className="h-7 w-7 drop-shadow">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </>
+            ) : (
+              <img
+                src={item.url}
+                alt={`${adTitle} image ${index + 1}`}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  const t = e.currentTarget;
+                  if (t.src !== FALLBACK_AD_IMAGE) t.src = FALLBACK_AD_IMAGE;
+                }}
+              />
+            )}
           </button>
         ))}
       </div>
@@ -372,12 +410,19 @@ export default function AdDetailRoutePage({ params }: AdDetailPageProps) {
       : typeof rawImages === 'string' && rawImages.trim()
         ? [rawImages]
         : [];
-
-    const cleaned = imageList
-      .map((image) => String(image || '').trim())
-      .filter(Boolean);
+    const cleaned = imageList.map((image) => String(image || '').trim()).filter(Boolean);
     const unique = Array.from(new Set(cleaned));
     return unique.length ? unique : [FALLBACK_AD_IMAGE];
+  }, [ad]);
+
+  const galleryVideos = useMemo(() => {
+    const rawVideos = ad?.videoUrl;
+    const videoList = Array.isArray(rawVideos)
+      ? rawVideos
+      : typeof rawVideos === 'string' && rawVideos.trim()
+        ? [rawVideos]
+        : [];
+    return videoList.map((v) => String(v || '').trim()).filter(Boolean);
   }, [ad]);
 
   const description = ad?.description?.trim() || 'No offer description available.';
@@ -422,7 +467,7 @@ export default function AdDetailRoutePage({ params }: AdDetailPageProps) {
           <div className="space-y-8">
             <section className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
               <div className="space-y-8">
-                <AdGallery images={galleryImages} adTitle={ad.title} />
+                <AdGallery images={galleryImages} videos={galleryVideos} adTitle={ad.title} />
                 <AdDescription description={description} />
               </div>
 

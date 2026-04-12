@@ -122,7 +122,7 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
         </IconButton>
       </DialogTitle>
 
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }, msOverflowStyle: 'none' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
@@ -179,6 +179,42 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                           }}
                           onClick={() => window.open(img, '_blank')}
                         />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                {data.ad?.videoUrl && data.ad.videoUrl.length > 0 && (
+                  <Box mt={1.5}>
+                    <Typography variant="caption" color="text.secondary" gutterBottom>Ad Videos</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 0.5 }}>
+                      {data.ad.videoUrl.map((vid: string, i: number) => (
+                        <Box
+                          key={i}
+                          sx={{
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                            border: '1px solid #eee',
+                            bgcolor: '#000',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => window.open(vid, '_blank')}
+                        >
+                          <video
+                            src={vid}
+                            controls
+                            muted
+                            loop
+                            preload="metadata"
+                            style={{
+                              width: '100%',
+                              maxHeight: 220,
+                              display: 'block',
+                              objectFit: 'contain',
+                            }}
+                            title={`Ad Video ${i + 1}`}
+                          />
+                        </Box>
                       ))}
                     </Box>
                   </Box>
