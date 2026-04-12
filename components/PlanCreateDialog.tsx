@@ -29,6 +29,8 @@ interface CreatePlanPayload {
   features: string[];
   duration: number;
   priority: number;
+  imageCount?: number;
+  videoCount?: number;
 }
 
 interface PlanCreateDialogProps {
@@ -45,6 +47,8 @@ const DEFAULT_FORM: CreatePlanPayload = {
   features: [''],
   duration: 30,
   priority: 1,
+  imageCount: 0,
+  videoCount: 0,
 };
 
 export default function PlanCreateDialog({ open, onClose, onSubmit }: PlanCreateDialogProps) {
@@ -185,6 +189,26 @@ export default function PlanCreateDialog({ open, onClose, onSubmit }: PlanCreate
               fullWidth
               required
               inputProps={{ min: 1 }}
+            />
+
+            <TextField
+              label="Image Count"
+              type="number"
+              value={form.imageCount ?? 0}
+              onChange={(event) => setForm((prev) => ({ ...prev, imageCount: Number(event.target.value) }))}
+              size="small"
+              fullWidth
+              inputProps={{ min: 0 }}
+            />
+
+            <TextField
+              label="Video Count"
+              type="number"
+              value={form.videoCount ?? 0}
+              onChange={(event) => setForm((prev) => ({ ...prev, videoCount: Number(event.target.value) }))}
+              size="small"
+              fullWidth
+              inputProps={{ min: 0 }}
             />
           </Box>
 
