@@ -628,9 +628,9 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
         const adsRes = await getAdsByPriority(adPage, ADS_PER_PAGE || 10);
         if (!isMounted) return;
 
-        const adPayload = (adsRes.data ?? {}) as PagedResponse<AdDto>;
+        const adPayload = (adsRes || {}) as PagedResponse<AdDto>;
 
-        const nextCurrentPage = Math.max(1, adPayload.pagination?.currentPage ?? adPage);
+        const nextCurrentPage = Math.max(1, adPayload.pagination?.currentPage ?? adPayload.pagination?.page ?? adPage);
         const nextTotalPages = Math.max(1, adPayload.pagination?.totalPages ?? 1);
 
         setAds(Array.isArray(adPayload.data) ? adPayload.data : []);
