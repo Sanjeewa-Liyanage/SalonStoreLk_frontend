@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { use, useEffect, useMemo, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -24,6 +24,7 @@ import Footer from '@/components/Footer';
 import { getSalonById } from '@/lib/salonService';
 import type { Salon } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import useEmblaCarousel from 'embla-carousel-react';
 import {
   Accordion,
   AccordionContent,
@@ -116,119 +117,139 @@ type SalonGalleryProps = {
 };
 
 function SalonGallery({ images, salonName }: SalonGalleryProps) {
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const imageSignature = images.join('|');
-  const hasMultipleImages = images.length > 1;
+  const hasMultiple = images.length > 1;
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const [mainRef, mainApi] = useEmblaCarousel({ loop: true, duration: 25 });
+  const [thumbRef, thumbApi] = useEmblaCarousel({
+    containScroll: 'keepSnaps',
+    dragFree: true,
+  });
+
+  const onThumbClick = useCallback(
+    (index: number) => {
+      if (!mainApi || !thumbApi) return;
+      mainApi.scrollTo(index);
+    },
+    [mainApi, thumbApi]
+  );
+
+  const onSelect = useCallback(() => {
+    if (!mainApi || !thumbApi) return;
+    const snap = mainApi.selectedScrollSnap();
+    setSelectedIndex(snap);
+    thumbApi.scrollTo(snap);
+  }, [mainApi, thumbApi]);
 
   useEffect(() => {
-    setSelectedImageIndex(0);
-  }, [imageSignature]);
+    if (!mainApi) return;
+    onSelect();
+    mainApi.on('select', onSelect);
+    mainApi.on('reInit', onSelect);
+    return () => {
+      mainApi.off('select', onSelect);
+      mainApi.off('reInit', onSelect);
+    };
+  }, [mainApi, onSelect]);
+
+  const showPrevious = useCallback(() => {
+    if (mainApi) mainApi.scrollPrev();
+  }, [mainApi]);
+
+  const showNext = useCallback(() => {
+    if (mainApi) mainApi.scrollNext();
+  }, [mainApi]);
 
   useEffect(() => {
-    if (!hasMultipleImages) return;
+    if (!hasMultiple) return;
 
     const timerId = window.setInterval(() => {
-      setSelectedImageIndex((current) => (current + 1) % images.length);
+      if (mainApi) mainApi.scrollNext();
     }, 4500);
 
     return () => window.clearInterval(timerId);
-  }, [hasMultipleImages, images.length, imageSignature]);
-
-  const activeImage = images[selectedImageIndex] || images[0] || FALLBACK_SALON_IMAGE;
-
-  const showPrevious = () => {
-    setSelectedImageIndex((current) => (current - 1 + images.length) % images.length);
-  };
-
-  const showNext = () => {
-    setSelectedImageIndex((current) => (current + 1) % images.length);
-  };
+  }, [hasMultiple, mainApi]);
 
   const handleKeyNavigation = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!hasMultipleImages) return;
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      showPrevious();
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      showNext();
-    }
+    if (!hasMultiple) return;
+    if (event.key === 'ArrowLeft') { event.preventDefault(); showPrevious(); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); showNext(); }
   };
 
+  if (images.length === 0) return null;
+
   return (
-    <section
-      className="space-y-3"
-      tabIndex={0}
-      onKeyDown={handleKeyNavigation}
-      aria-label="Salon image gallery"
-    >
-      <div className="relative overflow-hidden rounded-xl border border-[#d4a32b]/40 bg-zinc-100 p-2">
-        <div className="flex h-[clamp(300px,56vh,640px)] items-center justify-center">
-          <img
-            src={activeImage}
-            alt={salonName}
-            className="max-h-full w-full rounded-lg object-contain"
-            onError={(event) => {
-              const target = event.currentTarget;
-              if (target.src !== FALLBACK_SALON_IMAGE) {
-                target.src = FALLBACK_SALON_IMAGE;
-              }
-            }}
-          />
+    <section className="space-y-3" tabIndex={0} onKeyDown={handleKeyNavigation} aria-label="Salon image gallery">
+      <div className="relative overflow-hidden rounded-xl border border-[#d4a32b]/40 bg-zinc-900 p-2">
+        <div className="overflow-hidden" ref={mainRef}>
+          <div className="flex touch-pan-y" style={{ backfaceVisibility: 'hidden' }}>
+            {images.map((image, index) => (
+              <div
+                key={`${image}-${index}`}
+                className="relative flex h-[clamp(300px,56vh,640px)] min-w-0 flex-[0_0_100%] items-center justify-center p-2"
+              >
+                <img
+                  src={image}
+                  alt={`${salonName} ${index + 1}`}
+                  className="max-h-full w-full rounded-lg object-contain select-none"
+                  onError={(event) => {
+                    const target = event.currentTarget;
+                    if (target.src !== FALLBACK_SALON_IMAGE) target.src = FALLBACK_SALON_IMAGE;
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
-        {hasMultipleImages && (
+        {hasMultiple && (
           <>
             <button
               type="button"
               onClick={showPrevious}
-              className="absolute left-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white"
+              className="absolute left-4 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white disabled:opacity-50"
               aria-label="Previous image"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-6 w-6" />
             </button>
             <button
               type="button"
               onClick={showNext}
-              className="absolute right-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white"
+              className="absolute right-4 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white disabled:opacity-50"
               aria-label="Next image"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-6 w-6" />
             </button>
           </>
         )}
       </div>
 
-      <div
-        className="no-scrollbar flex gap-2 overflow-x-auto overflow-y-hidden pb-1"
-        style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
-      >
-        {images.map((image, index) => (
-          <button
-            key={`${image}-${index}`}
-            type="button"
-            onClick={() => setSelectedImageIndex(index)}
-            aria-label={`View image ${index + 1}`}
-            className={`h-20 w-28 shrink-0 overflow-hidden rounded-md border transition sm:h-24 sm:w-36 ${
-              selectedImageIndex === index
-                ? 'border-[#d4a32b] ring-1 ring-[#d4a32b]'
-                : 'border-black/15 hover:border-[#d4a32b]/60'
-            }`}
-          >
-            <img
-              src={image}
-              alt={`${salonName} image ${index + 1}`}
-              className="h-full w-full object-cover"
-              onError={(event) => {
-                const target = event.currentTarget;
-                if (target.src !== FALLBACK_SALON_IMAGE) {
-                  target.src = FALLBACK_SALON_IMAGE;
-                }
-              }}
-            />
-          </button>
-        ))}
+      <div className="overflow-hidden pb-1" ref={thumbRef}>
+        <div className="flex gap-2">
+          {images.map((image, index) => (
+            <button
+              key={`${image}-thumb-${index}`}
+              type="button"
+              onClick={() => onThumbClick(index)}
+              aria-label={`View image ${index + 1}`}
+              className={`relative h-20 w-28 shrink-0 min-w-0 overflow-hidden rounded-md border transition sm:h-24 sm:w-36 ${
+                selectedIndex === index
+                  ? 'border-[#d4a32b] ring-2 ring-[#d4a32b]'
+                  : 'border-black/15 hover:border-[#d4a32b]/60 hover:opacity-100 opacity-60'
+              }`}
+            >
+              <img
+                src={image}
+                alt={`Thumb ${index + 1}`}
+                className="h-full w-full object-cover select-none"
+                onError={(e) => {
+                  const t = e.currentTarget;
+                  if (t.src !== FALLBACK_SALON_IMAGE) t.src = FALLBACK_SALON_IMAGE;
+                }}
+              />
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );

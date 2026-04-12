@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, MapPin } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Loader2, MapPin, X, Play, Image as ImageIcon } from 'lucide-react';
 import { getByPrority } from '@/lib/salonService';
 import { getByPriority as getAdsByPriority } from '@/lib/adsService';
+import useEmblaCarousel from 'embla-carousel-react';
 
 type TimestampDto = {
   _seconds?: number;
@@ -93,157 +94,557 @@ function BlurredContainImage({
 
 type MediaItem = { type: 'image'; url: string } | { type: 'video'; url: string };
 
-function MediaTile({
-  item,
-  alt,
-  heightClass,
-  overlay,
-}: {
-  item: MediaItem;
-  alt: string;
-  heightClass: string;
-  overlay?: React.ReactNode;
-}) {
-  if (item.type === 'video') {
-    return (
-      <div className={`relative overflow-hidden rounded-xl border border-black/10 bg-black ${heightClass}`}>
-        <video
-          src={item.url}
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          controls
-          onClick={(e) => e.stopPropagation()}
-          className="h-full w-full object-contain"
-        />
-        {overlay}
-      </div>
-    );
-  }
-  return (
-    <div className={`relative overflow-hidden rounded-xl border border-black/10 bg-white ${heightClass}`}>
-      <BlurredContainImage src={safeImage(item.url)} alt={alt} heightClass="h-full" />
-      {overlay}
-    </div>
-  );
-}
-
-function AdMediaLayout({
-  images,
-  videos,
+function AdMediaPreview({
+  media,
   title,
 }: {
-  images: string[];
-  videos: string[];
+  media: MediaItem[];
   title: string;
 }) {
-  // Merge: images first, then videos
-  const media: MediaItem[] = [
-    ...(images.length ? images : [PLACEHOLDER_IMG]).map(
-      (url): MediaItem => ({ type: 'image', url })
-    ),
-    ...videos.map((url): MediaItem => ({ type: 'video', url })),
-  ];
+  const extraCount = media.length - 1;
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  if (media.length === 1) {
-    return (
-      <MediaTile item={media[0]} alt={title} heightClass="h-72" />
-    );
-  }
+  useEffect(() => {
+    if (media.length <= 1) return;
 
-  if (media.length === 2) {
-    return (
-      <div className="grid grid-cols-2 gap-1.5">
-        {media.slice(0, 2).map((item, idx) => (
-          <MediaTile key={`${item.url}-${idx}`} item={item} alt={`${title} ${idx + 1}`} heightClass="h-64" />
-        ))}
-      </div>
-    );
-  }
+    // Randomize the start so cards on the page don't cycle synchronously
+    const randomDelay = Math.random() * 2000;
+    
+    let interval: NodeJS.Timeout;
+    const timeout = setTimeout(() => {
+      interval = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % media.length);
+      }, 3500);
+    }, randomDelay);
 
-  if (media.length === 3) {
-    return (
-      <div className="grid grid-cols-2 gap-1.5">
-        <MediaTile item={media[0]} alt={`${title} 1`} heightClass="h-96" />
-        <div className="flex flex-col gap-1.5">
-          {media.slice(1, 3).map((item, idx) => (
-            <MediaTile key={`${item.url}-${idx}`} item={item} alt={`${title} ${idx + 2}`} heightClass="h-[188px]" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [media.length]);
 
-  // 4 or more — show first 4, overlay +N on last
-  const visible = media.slice(0, 4);
-  const remaining = media.length - 4;
+  if (media.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-1.5">
-      {visible.map((item, idx) => (
-        <MediaTile
-          key={`${item.url}-${idx}`}
-          item={item}
-          alt={`${title} ${idx + 1}`}
-          heightClass="h-48"
-          overlay={
-            idx === 3 && remaining > 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50 text-2xl font-bold text-white pointer-events-none">
-                +{remaining}
+    <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-100">
+      {media.map((item, index) => {
+        const isActive = index === currentIndex;
+        return (
+          <div
+            key={`${item.url}-${index}`}
+            className={`absolute inset-0 transition-opacity duration-1000 ${
+              isActive ? 'z-10 opacity-100' : 'z-0 opacity-0'
+            }`}
+            aria-hidden={!isActive}
+          >
+            {item.type === 'video' ? (
+              <div className="relative h-full w-full bg-black">
+                <video
+                  src={item.url}
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/20" />
+                <div className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white shadow-sm">
+                  <Play className="h-3.5 w-3.5 fill-white" />
+                  Video
+                </div>
               </div>
-            ) : undefined
-          }
-        />
-      ))}
+            ) : (
+              <img
+                src={safeImage(item.url)}
+                alt={`${title} preview ${index + 1}`}
+                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                loading={index === 0 ? 'eager' : 'lazy'}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      {/* Gradient overlay at bottom for better text visibility */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-black/60 to-transparent" />
+
+      <div className="absolute bottom-3 right-3 z-30 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-black shadow-sm">
+        <ImageIcon className="h-3.5 w-3.5 text-black/70" />
+        {media.length} media
+      </div>
+
+      {extraCount > 0 && (
+        <div className="absolute right-3 top-3 z-30 inline-flex items-center justify-center rounded-full bg-black/60 px-2.5 py-1 text-xs font-bold text-white backdrop-blur-sm">
+          +{extraCount}
+        </div>
+      )}
     </div>
   );
 }
+
+function AdGalleryModal({
+  ad,
+  open,
+  onClose,
+}: {
+  ad: AdDto | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const media = useMemo(() => {
+    if (!ad) return [];
+    const images = Array.isArray(ad.imageUrl) ? ad.imageUrl : [];
+    const videos = Array.isArray(ad.videoUrl) ? ad.videoUrl : [];
+    return [
+      ...images.map((url): MediaItem => ({ type: 'image', url })),
+      ...videos.map((url): MediaItem => ({ type: 'video', url }))
+    ];
+  }, [ad]);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveIndex(0);
+  }, [open, ad]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+      if (event.key === 'ArrowLeft') {
+        setActiveIndex((prev) => (prev === 0 ? media.length - 1 : prev - 1));
+      }
+      if (event.key === 'ArrowRight') {
+        setActiveIndex((prev) => (prev === media.length - 1 ? 0 : prev + 1));
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [open, media.length, onClose]);
+
+  if (!open || !ad || media.length === 0) return null;
+
+  const active = media[activeIndex];
+
+  const goPrev = () => {
+    setActiveIndex((prev) => (prev === 0 ? media.length - 1 : prev - 1));
+  };
+
+  const goNext = () => {
+    setActiveIndex((prev) => (prev === media.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-2 md:p-6 backdrop-blur-sm">
+      <div className="relative flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-black md:flex-row md:bg-zinc-950 shadow-2xl ring-1 ring-white/10">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-white hover:text-black"
+          aria-label="Close gallery"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="relative flex flex-1 items-center justify-center bg-black">
+          {media.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={goPrev}
+                className="absolute left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white hover:text-black"
+                aria-label="Previous media"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={goNext}
+                className="absolute right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white hover:text-black"
+                aria-label="Next media"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          )}
+
+          {active.type === 'video' ? (
+            <video
+              key={`vid-${activeIndex}`}
+              src={active.url}
+              controls
+              autoPlay
+              playsInline
+              className="h-full max-h-[70vh] w-full object-contain md:max-h-[85vh]"
+            />
+          ) : (
+            <img
+              key={`img-${activeIndex}`}
+              src={safeImage(active.url)}
+              alt={`${ad.title} ${activeIndex + 1}`}
+              className="h-full max-h-[70vh] w-full object-contain md:max-h-[85vh]"
+            />
+          )}
+
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+            {activeIndex + 1} / {media.length}
+          </div>
+        </div>
+
+        <div className="flex max-h-[40vh] w-full flex-col border-white/10 bg-white md:max-h-none md:w-[380px] md:border-l">
+          <div className="flex-1 overflow-y-auto p-5">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-black">
+                  {ad.salonName || 'SalonStore Partner'}
+                </p>
+                <p className="text-xs text-black/50">
+                  {formatPostDate(ad.createdAt)}
+                </p>
+              </div>
+              <span className="inline-flex items-center rounded-full bg-[#d4a017]/15 px-2.5 py-1 text-[11px] font-semibold text-[#8a6700]">
+                Sponsored
+              </span>
+            </div>
+
+            <h3 className="text-xl font-bold leading-tight text-black">{ad.title}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-black/70">
+              {ad.description || 'Exclusive promotion from our salon partner.'}
+            </p>
+
+            <div className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-black/60">
+              <MapPin className="h-4 w-4" />
+              Available islandwide
+            </div>
+            
+            <div className="mt-6 border-t border-black/10 pt-5">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-black/40">
+                Gallery
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {media.map((item, index) => (
+                  <button
+                    key={`${index}`}
+                    type="button"
+                    onClick={() => setActiveIndex(index)}
+                    className={`relative aspect-square overflow-hidden rounded-lg border-2 transition ${
+                      activeIndex === index
+                        ? 'border-[#d4a017]'
+                        : 'border-transparent hover:border-black/20'
+                    }`}
+                  >
+                    {item.type === 'video' ? (
+                      <div className="relative h-full w-full bg-black">
+                        <video
+                          src={item.url}
+                          preload="metadata"
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/20" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Play className="h-4 w-4 fill-white text-white drop-shadow" />
+                        </div>
+                      </div>
+                    ) : (
+                      <img
+                        src={safeImage(item.url)}
+                        alt={`Thumb ${index + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdCard({
+  ad,
+  onOpen,
+  onLearnMore,
+}: {
+  ad: AdDto;
+  onOpen: (ad: AdDto) => void;
+  onLearnMore?: (adId: string) => void;
+}) {
+  const media = useMemo(() => {
+    const images = Array.isArray(ad.imageUrl) ? ad.imageUrl : [];
+    const videos = Array.isArray(ad.videoUrl) ? ad.videoUrl : [];
+    const out: MediaItem[] = [
+      ...images.map((url): MediaItem => ({ type: 'image', url })),
+      ...videos.map((url): MediaItem => ({ type: 'video', url }))
+    ];
+    if (out.length === 0) {
+      out.push({ type: 'image', url: PLACEHOLDER_IMG });
+    }
+    return out;
+  }, [ad]);
+
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+      <button
+        type="button"
+        onClick={() => onOpen(ad)}
+        className="relative block w-full text-left"
+      >
+        <AdMediaPreview media={media} title={ad.title} />
+      </button>
+
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="line-clamp-1 text-sm font-semibold text-black">
+              {ad.salonName || 'SalonStore Partner'}
+            </p>
+            <p className="text-xs text-black/50">{formatPostDate(ad.createdAt)}</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[#d4a017]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#d4a017]">
+            Sponsored
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onOpen(ad)}
+          className="block text-left"
+        >
+          <h3 className="line-clamp-2 text-lg font-bold leading-tight text-black transition group-hover:text-[#d4a017]">
+            {ad.title}
+          </h3>
+        </button>
+
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-black/60">
+          {ad.description || 'Exclusive promotion from our salon partner.'}
+        </p>
+
+        <div className="mt-auto pt-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium text-black/50">
+              <MapPin className="h-3.5 w-3.5" />
+              Available islandwide
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpen(ad)}
+                className="rounded-xl border border-black/10 px-3 py-2 text-xs font-bold text-black transition hover:bg-black/5"
+              >
+                Preview
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onLearnMore?.(ad.id)}
+                className="rounded-xl bg-[#d4a017] px-3 py-2 text-xs font-bold text-black transition hover:bg-[#c79614]"
+              >
+                Learn More
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export function FeaturedAdsSection({
+  ads,
+  onAdSelect,
+  isLoading,
+  error,
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  ads: AdDto[];
+  onAdSelect?: (adId: string) => void;
+  isLoading: boolean;
+  error: string | null;
+  page: number;
+  totalPages: number;
+  onPageChange: (newPage: number) => void;
+}) {
+  const [selectedAd, setSelectedAd] = useState<AdDto | null>(null);
+
+  const pageNumbers = useMemo(() => {
+    const pages: number[] = [];
+    let start = Math.max(1, page - 2);
+    let end = Math.min(totalPages, start + 4);
+    if (end - start < 4 && totalPages >= 5) {
+      start = Math.max(1, end - 4);
+    }
+    for (let p = start; p <= end; p += 1) {
+      pages.push(p);
+    }
+    return pages;
+  }, [page, totalPages]);
+
+  return (
+    <>
+      <section className="mx-auto mt-10 w-full max-w-screen-2xl px-3 md:px-5">
+        <div className="mb-6 flex items-end justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-black sm:text-3xl">
+              Featured Offers
+            </h2>
+            <p className="mt-1.5 text-sm text-black/60">
+              Explore amazing deals and services from top salons
+            </p>
+          </div>
+        </div>
+
+        {!isLoading && !error && ads.length === 0 ? (
+          <div className="rounded-2xl border border-black/10 bg-white p-6 text-center text-sm text-black/60">
+            No active offers available at the moment.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {ads.map((ad) => (
+                <AdCard
+                  key={ad.id}
+                  ad={ad}
+                  onOpen={setSelectedAd}
+                  onLearnMore={onAdSelect}
+                />
+              ))}
+            </div>
+
+            <div className="mt-8 flex items-center justify-center gap-1.5">
+              <button
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-black/20 text-black/70 disabled:cursor-not-allowed disabled:opacity-45"
+                type="button"
+                onClick={() => page > 1 && onPageChange(page - 1)}
+                disabled={page <= 1}
+                aria-label="Previous ads page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              {pageNumbers.map((pageNum) => (
+                <button
+                  key={pageNum}
+                  className={`h-7 min-w-7 rounded-md px-2 text-xs font-semibold ${
+                    pageNum === page
+                      ? 'bg-[#1f5eff] text-white'
+                      : 'border border-black/20 bg-white text-black/70 hover:bg-black/5'
+                  }`}
+                  type="button"
+                  onClick={() => onPageChange(pageNum)}
+                >
+                  {pageNum}
+                </button>
+              ))}
+
+              <button
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-black/20 text-black/70 disabled:cursor-not-allowed disabled:opacity-45"
+                type="button"
+                onClick={() => page < totalPages && onPageChange(page + 1)}
+                disabled={page >= totalPages}
+                aria-label="Next ads page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+
+      <AdGalleryModal
+        ad={selectedAd}
+        open={!!selectedAd}
+        onClose={() => setSelectedAd(null)}
+      />
+    </>
+  );
+}
+
+
 
 export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPageProps) {
   const [salons, setSalons] = useState<SalonDto[]>([]);
-  const [ads, setAds] = useState<AdDto[]>([]);
   const [salonPage, setSalonPage] = useState(1);
   const [salonTotalPages, setSalonTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isSalonLoading, setIsSalonLoading] = useState(true);
+  const [salonError, setSalonError] = useState<string | null>(null);
+
+  const [ads, setAds] = useState<AdDto[]>([]);
+  const [adPage, setAdPage] = useState(1);
+  const [adTotalPages, setAdTotalPages] = useState(1);
+  const [isAdLoading, setIsAdLoading] = useState(true);
+  const [adError, setAdError] = useState<string | null>(null);
+
   const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadData() {
-      setIsLoading(true);
-      setError(null);
+    async function loadSalons() {
+      setIsSalonLoading(true);
+      setSalonError(null);
 
       try {
-        const [salonRes, adsRes] = await Promise.all([
-          getByPrority(salonPage, SALONS_PER_PAGE),
-          getAdsByPriority(1, 10),
-        ]);
-
+        const salonRes = await getByPrority(salonPage, SALONS_PER_PAGE);
         if (!isMounted) return;
 
         const salonPayload = (salonRes.data ?? {}) as PagedResponse<SalonDto>;
-        const adPayload = (adsRes.data ?? {}) as PagedResponse<AdDto>;
-
         setSalons(Array.isArray(salonPayload.data) ? salonPayload.data : []);
-        setAds(Array.isArray(adPayload.data) ? adPayload.data : []);
         setSalonTotalPages(Math.max(1, salonPayload.pagination?.totalPages ?? 1));
       } catch (err: any) {
         if (!isMounted) return;
-        setError(err?.response?.data?.message || 'Failed to load salon and ad data.');
+        setSalonError(err?.response?.data?.message || 'Failed to load salon data.');
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) setIsSalonLoading(false);
       }
     }
 
-    loadData();
+    loadSalons();
 
     return () => {
       isMounted = false;
     };
   }, [salonPage]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAds() {
+      setIsAdLoading(true);
+      setAdError(null);
+
+      try {
+        const adsRes = await getAdsByPriority(adPage, 10);
+        if (!isMounted) return;
+
+        const adPayload = (adsRes.data ?? {}) as PagedResponse<AdDto>;
+        setAds(Array.isArray(adPayload.data) ? adPayload.data : []);
+        setAdTotalPages(Math.max(1, adPayload.pagination?.totalPages ?? 1));
+      } catch (err: any) {
+        if (!isMounted) return;
+        setAdError(err?.response?.data?.message || 'Failed to load ad data.');
+      } finally {
+        if (isMounted) setIsAdLoading(false);
+      }
+    }
+
+    loadAds();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [adPage]);
 
   const showingLabel = useMemo(() => {
     const from = (salonPage - 1) * SALONS_PER_PAGE + 1;
@@ -293,12 +694,12 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-          {isLoading ? (
+          {isSalonLoading ? (
             <div className="flex h-56 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-[#d4a017]" />
             </div>
-          ) : error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</div>
+          ) : salonError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">{salonError}</div>
           ) : (
             <>
               <div className="mb-3 flex items-center justify-between">
@@ -371,11 +772,10 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
                 {pageNumbers.map((pageNum) => (
                   <button
                     key={pageNum}
-                    className={`h-7 min-w-7 rounded-md px-2 text-xs font-semibold ${
-                      pageNum === salonPage
-                        ? 'bg-[#1f5eff] text-white'
-                        : 'border border-black/20 bg-white text-black/70 hover:bg-black/5'
-                    }`}
+                    className={`h-7 min-w-7 rounded-md px-2 text-xs font-semibold ${pageNum === salonPage
+                      ? 'bg-[#1f5eff] text-white'
+                      : 'border border-black/20 bg-white text-black/70 hover:bg-black/5'
+                      }`}
                     type="button"
                     onClick={() => setSalonPage(pageNum)}
                   >
@@ -398,71 +798,15 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
         </div>
       </section>
 
-      <section className="mx-auto mt-10 w-full max-w-screen-2xl px-3 md:px-5">
-        <h2 className="text-3xl font-bold tracking-tight text-black">Featured Offers</h2>
-        <p className="mt-1 text-sm text-black/55">Scroll to explore amazing deals and services</p>
-
-        <div className="mt-5 space-y-4">
-          {ads.map((ad) => (
-            <article
-              key={ad.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onAdSelect?.(ad.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  onAdSelect?.(ad.id);
-                }
-              }}
-              className="cursor-pointer overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm"
-            >
-              <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-black">{ad.salonName || 'SalonStore Partner'}</p>
-                  <p className="text-xs text-black/45">{formatPostDate(ad.createdAt)}</p>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-[#d4a017]/15 px-2.5 py-1 text-[11px] font-semibold text-[#8a6700]">
-                  Sponsored
-                </span>
-              </div>
-
-              <div className="space-y-3 p-4">
-                <h3 className="text-base font-semibold text-black">{ad.title}</h3>
-                <p className="line-clamp-4 text-sm leading-relaxed text-black/70">{ad.description || 'Exclusive promotion from our salon partner.'}</p>
-                <AdMediaLayout
-                  images={Array.isArray(ad.imageUrl) ? ad.imageUrl : []}
-                  videos={Array.isArray(ad.videoUrl) ? ad.videoUrl : []}
-                  title={ad.title}
-                />
-              </div>
-
-              <div className="flex items-center justify-between border-t border-black/5 px-4 py-3">
-                <div className="inline-flex items-center gap-1 text-xs text-black/50">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Available islandwide
-                </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAdSelect?.(ad.id);
-                  }}
-                  className="rounded-md bg-[#d4a017] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c79614]"
-                >
-                  Learn More
-                </button>
-              </div>
-            </article>
-          ))}
-
-          {!isLoading && !error && ads.length === 0 && (
-            <div className="rounded-2xl border border-black/10 bg-white p-6 text-center text-sm text-black/60">
-              No active offers available at the moment.
-            </div>
-          )}
-        </div>
-      </section>
+      <FeaturedAdsSection
+        ads={ads}
+        onAdSelect={onAdSelect}
+        isLoading={isAdLoading}
+        error={adError}
+        page={adPage}
+        totalPages={adTotalPages}
+        onPageChange={setAdPage}
+      />
     </main>
   );
 }

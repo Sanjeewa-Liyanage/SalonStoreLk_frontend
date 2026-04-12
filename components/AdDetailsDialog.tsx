@@ -202,9 +202,11 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                         >
                           <video
                             src={vid}
-                            controls
+                            autoPlay
                             muted
                             loop
+                            playsInline
+                            controlsList="nodownload"
                             preload="metadata"
                             style={{
                               width: '100%',
@@ -213,6 +215,13 @@ export default function AdDetailsDialog({ open, onClose, adId }: AdDetailsDialog
                               objectFit: 'contain',
                             }}
                             title={`Ad Video ${i + 1}`}
+                            ref={(el) => {
+                              if (el) {
+                                el.defaultMuted = true;
+                                el.muted = true;
+                                el.play().catch(() => {});
+                              }
+                            }}
                           />
                         </Box>
                       ))}

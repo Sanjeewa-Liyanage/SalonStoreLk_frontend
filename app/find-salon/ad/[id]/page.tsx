@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { use, useEffect, useMemo, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -16,6 +16,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Badge } from '@/components/ui/badge';
 import { getAdDetails } from '@/lib/adsService';
+import useEmblaCarousel from 'embla-carousel-react';
 
 type FirestoreTimestamp = {
   _seconds?: number;
@@ -88,43 +89,64 @@ type AdGalleryProps = {
 };
 
 function AdGallery({ images, videos, adTitle }: AdGalleryProps) {
-  // Merge images first, then videos
   const media: GalleryItem[] = [
     ...images.map((url): GalleryItem => ({ type: 'image', url })),
     ...videos.map((url): GalleryItem => ({ type: 'video', url })),
   ];
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const mediaSignature = media.map((m) => m.url).join('|');
   const hasMultiple = media.length > 1;
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Reset to first item when media list changes
+  const [mainRef, mainApi] = useEmblaCarousel({ loop: true, duration: 25 });
+  const [thumbRef, thumbApi] = useEmblaCarousel({
+    containScroll: 'keepSnaps',
+    dragFree: true,
+  });
+
+  const onThumbClick = useCallback(
+    (index: number) => {
+      if (!mainApi || !thumbApi) return;
+      mainApi.scrollTo(index);
+    },
+    [mainApi, thumbApi]
+  );
+
+  const onSelect = useCallback(() => {
+    if (!mainApi || !thumbApi) return;
+    const snap = mainApi.selectedScrollSnap();
+    setSelectedIndex(snap);
+    thumbApi.scrollTo(snap);
+  }, [mainApi, thumbApi]);
+
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [mediaSignature]);
+    if (!mainApi) return;
+    onSelect();
+    mainApi.on('select', onSelect);
+    mainApi.on('reInit', onSelect);
+    return () => {
+      mainApi.off('select', onSelect);
+      mainApi.off('reInit', onSelect);
+    };
+  }, [mainApi, onSelect]);
 
-  // Auto-advance only when the active item is an image (pause on videos)
+  const showPrevious = useCallback(() => {
+    if (mainApi) mainApi.scrollPrev();
+  }, [mainApi]);
+
+  const showNext = useCallback(() => {
+    if (mainApi) mainApi.scrollNext();
+  }, [mainApi]);
+
   useEffect(() => {
     if (!hasMultiple) return;
     if (media[selectedIndex]?.type === 'video') return;
 
     const timerId = window.setInterval(() => {
-      setSelectedIndex((current) => {
-        const next = (current + 1) % media.length;
-        return next;
-      });
+      if (mainApi) mainApi.scrollNext();
     }, 4500);
 
     return () => window.clearInterval(timerId);
-  }, [hasMultiple, media.length, mediaSignature, selectedIndex]);
-
-  const activeItem = media[selectedIndex] ?? media[0];
-
-  const showPrevious = () =>
-    setSelectedIndex((current) => (current - 1 + media.length) % media.length);
-
-  const showNext = () =>
-    setSelectedIndex((current) => (current + 1) % media.length);
+  }, [hasMultiple, media, selectedIndex, mainApi]);
 
   const handleKeyNavigation = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!hasMultiple) return;
@@ -132,40 +154,51 @@ function AdGallery({ images, videos, adTitle }: AdGalleryProps) {
     if (event.key === 'ArrowRight') { event.preventDefault(); showNext(); }
   };
 
-  if (!activeItem) return null;
+  if (media.length === 0) return null;
 
   return (
-    <section
-      className="space-y-3"
-      tabIndex={0}
-      onKeyDown={handleKeyNavigation}
-      aria-label="Ad media gallery"
-    >
-      {/* Main viewer */}
+    <section className="space-y-3" tabIndex={0} onKeyDown={handleKeyNavigation} aria-label="Ad media gallery">
+      {/* Main Embla Carousel */}
       <div className="relative overflow-hidden rounded-xl border border-[#d4a32b]/40 bg-zinc-900 p-2">
-        <div className="flex h-[clamp(300px,56vh,640px)] items-center justify-center">
-          {activeItem.type === 'video' ? (
-            <video
-              key={activeItem.url}
-              src={activeItem.url}
-              controls
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              className="max-h-full w-full rounded-lg object-contain"
-            />
-          ) : (
-            <img
-              src={activeItem.url}
-              alt={adTitle}
-              className="max-h-full w-full rounded-lg object-contain"
-              onError={(event) => {
-                const target = event.currentTarget;
-                if (target.src !== FALLBACK_AD_IMAGE) target.src = FALLBACK_AD_IMAGE;
-              }}
-            />
-          )}
+        <div className="overflow-hidden" ref={mainRef}>
+          <div className="flex touch-pan-y" style={{ backfaceVisibility: 'hidden' }}>
+            {media.map((item, index) => (
+              <div
+                key={`${item.url}-${index}`}
+                className="relative flex h-[clamp(300px,56vh,640px)] min-w-0 flex-[0_0_100%] items-center justify-center p-2"
+              >
+                {item.type === 'video' ? (
+                  <video
+                    src={item.url}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    controlsList="nodownload"
+                    preload="metadata"
+                    className="max-h-full w-full rounded-lg object-contain"
+                    ref={(el) => {
+                      if (el) {
+                        el.defaultMuted = true;
+                        el.muted = true;
+                        el.play().catch(() => {});
+                      }
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={item.url}
+                    alt={`${adTitle} ${index + 1}`}
+                    className="max-h-full w-full rounded-lg object-contain select-none"
+                    onError={(event) => {
+                      const target = event.currentTarget;
+                      if (target.src !== FALLBACK_AD_IMAGE) target.src = FALLBACK_AD_IMAGE;
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         {hasMultiple && (
@@ -173,68 +206,66 @@ function AdGallery({ images, videos, adTitle }: AdGalleryProps) {
             <button
               type="button"
               onClick={showPrevious}
-              className="absolute left-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white"
+              className="absolute left-4 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white disabled:opacity-50"
               aria-label="Previous"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-6 w-6" />
             </button>
             <button
               type="button"
               onClick={showNext}
-              className="absolute right-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white"
+              className="absolute right-4 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/20 bg-white/90 text-black shadow-sm transition hover:bg-white disabled:opacity-50"
               aria-label="Next"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-6 w-6" />
             </button>
           </>
         )}
       </div>
 
-      {/* Thumbnail strip */}
-      <div
-        className="no-scrollbar flex gap-2 overflow-x-auto overflow-y-hidden pb-1"
-        style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
-      >
-        {media.map((item, index) => (
-          <button
-            key={`${item.url}-${index}`}
-            type="button"
-            onClick={() => setSelectedIndex(index)}
-            aria-label={`View ${item.type} ${index + 1}`}
-            className={`relative h-20 w-28 shrink-0 overflow-hidden rounded-md border transition sm:h-24 sm:w-36 ${
-              selectedIndex === index
-                ? 'border-[#d4a32b] ring-1 ring-[#d4a32b]'
-                : 'border-black/15 hover:border-[#d4a32b]/60'
-            }`}
-          >
-            {item.type === 'video' ? (
-              <>
-                <video
+      {/* Thumbnails Embla Carousel */}
+      <div className="overflow-hidden pb-1" ref={thumbRef}>
+        <div className="flex gap-2">
+          {media.map((item, index) => (
+            <button
+              key={`${item.url}-thumb-${index}`}
+              type="button"
+              onClick={() => onThumbClick(index)}
+              aria-label={`View ${item.type} ${index + 1}`}
+              className={`relative h-20 w-28 shrink-0 min-w-0 overflow-hidden rounded-md border transition sm:h-24 sm:w-36 ${
+                selectedIndex === index
+                  ? 'border-[#d4a32b] ring-2 ring-[#d4a32b]'
+                  : 'border-black/15 hover:border-[#d4a32b]/60 hover:opacity-100 opacity-60'
+              }`}
+            >
+              {item.type === 'video' ? (
+                <>
+                  <video
+                    src={item.url}
+                    muted
+                    preload="metadata"
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                    <svg viewBox="0 0 24 24" fill="white" className="h-8 w-8 drop-shadow-md">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </>
+              ) : (
+                <img
                   src={item.url}
-                  muted
-                  preload="metadata"
-                  className="h-full w-full object-cover"
+                  alt={`Thumb ${index + 1}`}
+                  className="h-full w-full object-cover select-none"
+                  onError={(e) => {
+                    const t = e.currentTarget;
+                    if (t.src !== FALLBACK_AD_IMAGE) t.src = FALLBACK_AD_IMAGE;
+                  }}
                 />
-                {/* Play icon overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <svg viewBox="0 0 24 24" fill="white" className="h-7 w-7 drop-shadow">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </>
-            ) : (
-              <img
-                src={item.url}
-                alt={`${adTitle} image ${index + 1}`}
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  const t = e.currentTarget;
-                  if (t.src !== FALLBACK_AD_IMAGE) t.src = FALLBACK_AD_IMAGE;
-                }}
-              />
-            )}
-          </button>
-        ))}
+              )}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );
