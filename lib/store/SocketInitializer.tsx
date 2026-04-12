@@ -136,7 +136,6 @@ export function SocketInitializer({ children }: { children: React.ReactNode }) {
         });
 
         socket.on('error', (err: any) => {
-            console.error('❌ Socket error:', err.message || err);
             if (shouldRefreshSocketToken(err)) {
                 void refreshTokenAndReconnect();
             }

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { getUserProfile, refreshAccessToken } from "@/lib/authService";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { setCredentials, logout as logoutAction, setAuthLoading } from "@/lib/store/slices/authSlice";
+import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from "@/lib/tokenStorage";
 
 interface User {
   id: string;
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await getUserProfile();
 
       // Get the latest token (in case it was refreshed during the getUserProfile call)
-      const latestToken = sessionStorage.getItem("accessToken") || token;
+      const latestToken = getAccessToken() || token;
 
       // Sync with Redux Store
       dispatch(setCredentials({ user: userData, accessToken: latestToken }));
@@ -56,8 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = sessionStorage.getItem("accessToken");
-      const refreshToken = sessionStorage.getItem("refreshToken");
+      const token = getAccessToken();
+      const refreshToken = getRefreshToken();
 
       if (token) {
         await fetchUser(token);
@@ -80,20 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (token: string, refreshToken: string) => {
-    sessionStorage.setItem("accessToken", token);
-    sessionStorage.setItem("refreshToken", refreshToken);
+    setAuthTokens(token, refreshToken);
     await fetchUser(token);
   };
 
   const refreshUser = async () => {
-    const token = sessionStorage.getItem("accessToken");
+    const token = getAccessToken();
     if (!token) return;
     await fetchUser(token);
   };
 
   const logout = () => {
-    sessionStorage.removeItem("accessToken");
-    sessionStorage.removeItem("refreshToken");
+    clearAuthTokens();
     sessionStorage.removeItem("user");
     dispatch(logoutAction()); // Trigger Redux logout
     setUser(null);
