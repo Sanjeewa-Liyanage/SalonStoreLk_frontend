@@ -35,8 +35,11 @@ type AdDto = {
 type GenericPagination = {
   page?: number;
   currentPage?: number;
+  limit?: number;
   totalPages?: number;
   totalItems?: number;
+  hasNextPage?: boolean;
+  hasPreviousPage?: boolean;
 };
 
 type PagedResponse<T> = {
@@ -50,6 +53,7 @@ interface FindSalonPageProps {
 }
 
 const SALONS_PER_PAGE = 10;
+const ADS_PER_PAGE = 10;
 
 const PLACEHOLDER_IMG =
   'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1200&q=70';
@@ -109,7 +113,7 @@ function AdMediaPreview({
 
     // Randomize the start so cards on the page don't cycle synchronously
     const randomDelay = Math.random() * 2000;
-    
+
     let interval: NodeJS.Timeout;
     const timeout = setTimeout(() => {
       interval = setInterval(() => {
@@ -132,9 +136,8 @@ function AdMediaPreview({
         return (
           <div
             key={`${item.url}-${index}`}
-            className={`absolute inset-0 transition-opacity duration-1000 ${
-              isActive ? 'z-10 opacity-100' : 'z-0 opacity-0'
-            }`}
+            className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'z-10 opacity-100' : 'z-0 opacity-0'
+              }`}
             aria-hidden={!isActive}
           >
             {item.type === 'video' ? (
@@ -322,7 +325,7 @@ function AdGalleryModal({
               <MapPin className="h-4 w-4" />
               Available islandwide
             </div>
-            
+
             <div className="mt-6 border-t border-black/10 pt-5">
               <p className="mb-3 text-xs font-bold uppercase tracking-wider text-black/40">
                 Gallery
@@ -333,11 +336,10 @@ function AdGalleryModal({
                     key={`${index}`}
                     type="button"
                     onClick={() => setActiveIndex(index)}
-                    className={`relative aspect-square overflow-hidden rounded-lg border-2 transition ${
-                      activeIndex === index
+                    className={`relative aspect-square overflow-hidden rounded-lg border-2 transition ${activeIndex === index
                         ? 'border-[#d4a017]'
                         : 'border-transparent hover:border-black/20'
-                    }`}
+                      }`}
                   >
                     {item.type === 'video' ? (
                       <div className="relative h-full w-full bg-black">
@@ -536,11 +538,10 @@ export function FeaturedAdsSection({
               {pageNumbers.map((pageNum) => (
                 <button
                   key={pageNum}
-                  className={`h-7 min-w-7 rounded-md px-2 text-xs font-semibold ${
-                    pageNum === page
+                  className={`h-7 min-w-7 rounded-md px-2 text-xs font-semibold ${pageNum === page
                       ? 'bg-[#1f5eff] text-white'
                       : 'border border-black/20 bg-white text-black/70 hover:bg-black/5'
-                  }`}
+                    }`}
                   type="button"
                   onClick={() => onPageChange(pageNum)}
                 >
@@ -585,7 +586,6 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
   const [adTotalPages, setAdTotalPages] = useState(1);
   const [isAdLoading, setIsAdLoading] = useState(true);
   const [adError, setAdError] = useState<string | null>(null);
-
   const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -625,12 +625,20 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
       setAdError(null);
 
       try {
-        const adsRes = await getAdsByPriority(adPage, 10);
+        const adsRes = await getAdsByPriority(adPage, ADS_PER_PAGE || 10);
         if (!isMounted) return;
 
         const adPayload = (adsRes.data ?? {}) as PagedResponse<AdDto>;
+
+        const nextCurrentPage = Math.max(1, adPayload.pagination?.currentPage ?? adPage);
+        const nextTotalPages = Math.max(1, adPayload.pagination?.totalPages ?? 1);
+
         setAds(Array.isArray(adPayload.data) ? adPayload.data : []);
-        setAdTotalPages(Math.max(1, adPayload.pagination?.totalPages ?? 1));
+        setAdTotalPages(nextTotalPages);
+
+        if (nextCurrentPage !== adPage) {
+          setAdPage(nextCurrentPage);
+        }
       } catch (err: any) {
         if (!isMounted) return;
         setAdError(err?.response?.data?.message || 'Failed to load ad data.');
@@ -663,6 +671,8 @@ export default function FindSalonPage({ onSalonSelect, onAdSelect }: FindSalonPa
     for (let p = start; p <= end; p += 1) pages.push(p);
     return pages;
   }, [salonPage, salonTotalPages]);
+
+
 
   const scrollCarousel = (direction: 'left' | 'right') => {
     const node = carouselRef.current;
